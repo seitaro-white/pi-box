@@ -1,113 +1,61 @@
 # Pi Box
 
-A Linux container for [Pi](https://pi.dev), with coding tools, persistent workspaces, and tmux sessions you can detach from and rejoin.
+Lightweight development container built around the [Pi](https://pi.dev) agent harness. Can be run locally or remotely (via home server or VM)
 
-Includes **pi-subagents** and **pi-web-access** with upstream defaults. No model credentials are included. A core-only installation example is planned.
+Comes installed with:
+- [Pi](https://pi.dev) (agent harness)
+- [tmux](https://github.com/tmux/tmux/wiki) (for session management)
+- git, ripgrep, fd
+- python (uv)
+- JS (node, npm)
 
-## Quick start
+This is my personal remote dev setup for coding, which I thought I'd share with the world + develop publicly.
 
-You need Docker installed and running. Run steps 1–3 in your **host terminal**, from this repository. These commands assume a new installation; if you already have a `pi-box-dev` container or `pi-box-*` volumes, inspect them before reusing them. Do not run two containers against the same workspace/Pi-state volumes.
 
-### 1. Build the image
+## Quickstart - install and run locally
+
+Make sure Docker is installed and running, then run steps 1–3 in your **host terminal** from this repository.
+
+### 1. Build image
 
 ```bash
 docker build -t pi-box:0.2.0 .
 ```
 
-### 2. Start the container
+### 2. Start container
 
 ```bash
 docker run -d --name pi-box-dev \
-  --cap-drop=ALL --security-opt=no-new-privileges \
+  # Assign volumes if they don't exist
   -v pi-box-workspace:/workspace \
   -v pi-box-agent:/home/node/.pi/agent \
+  # Additional privilege restriction
+  --cap-drop=ALL --security-opt=no-new-privileges \
   pi-box:0.2.0
 ```
 
-Docker creates the named volumes if they do not exist:
 
-- **`pi-box-workspace`** stores your projects.
-- **`pi-box-agent`** stores Pi settings, login and conversation history.
+### 3. Open shell within container and attach with tmux, start pi
 
-The container starts a Bash shell inside tmux—not Pi itself.
+ On your host:
 
-### 3. Attach to the shell
+ ```bash
+   docker exec -it pi-box-dev bash
+ ```
 
-```bash
-docker exec -it pi-box-dev tmux attach-session -t '=shell'
-```
+ Inside the container:
 
-### 4. Start Pi inside the container
+ ```bash
+   tmux attach-session -t '=shell'
+ ```
 
-```bash
-mkdir -p /workspace/my-project
-cd /workspace/my-project
-pi
-```
+ Once attached to the tmux session:
 
-Use `/login` in Pi to authenticate. Search providers and other optional extension features may need separate configuration; installed does not mean configured.
+ ```bash
+   cd /workspace
+   pi
+ ```
 
-**Detach:** press **Ctrl+B**, then **D**. Pi continues while the container and host stay running. Reattach using step 3. Host sleep, shutdown and container restart interrupt work.
-
-## Everyday commands
-
-Run these on the host:
-
-```bash
-docker ps                          # list running containers
-docker stop pi-box-dev             # end ALL sessions/jobs in this container
-docker start pi-box-dev            # restart with a fresh shell
-```
-
-After restarting, attach again, return to your project directory and run `pi --continue` or `pi --resume`. Saved conversations can be resumed; running processes cannot.
-
-For VS Code, use **Dev Containers: Attach to Running Container…** and choose `pi-box-dev`.
-
-## Rebuild and update
-
-First build the updated image; this does not interrupt the running container:
-
-```bash
-docker build -t pi-box:0.2.0 .
-```
-
-When all users have finished their work, stop and remove the old container:
-
-```bash
-docker stop pi-box-dev
-docker rm pi-box-dev
-```
-
-Then repeat **steps 2 and 3** above. Reusing the same named volumes preserves projects and Pi state. **Do not delete the volumes or add a volume-removal option.** Reconnect terminals/VS Code and resume Pi manually.
-
-Files and installed tools outside `/workspace` and `/home/node/.pi/agent` may disappear on replacement. Existing Pi settings are retained; rebuilding does not reset operator preferences or remove configuration seeded by earlier versions.
-
-## What's included
-
-- Node 24.21.0, Pi 1.0.2, pi-subagents 0.76.0 and pi-web-access 0.36.0.
-- uv 0.12.23, Python 3.13.16, Bash, Git, ripgrep, fd and tmux.
-- UTF-8 terminal defaults and tmux mouse support.
-
-Startup adds the installed extension package paths to Pi settings. It does not seed custom extension policy files, limit concurrency or disable built-in agents; package resources and policies use upstream defaults. Existing user configuration is left intact. Additional uv tools/interpreters use configured locations in the Pi-state volume.
-
-## Podman and SSH (optional)
-
-The same Dockerfile can be built with Podman. Use your selected engine in place of `docker` in the commands above. On macOS, explicitly select the intended Podman connection; rootful and rootless connections have separate container inventories.
-
-For a Mac installation with the following executable/connection, define this function and use `p` in place of `docker`:
-
-```bash
-p() { /opt/podman/bin/podman --connection podman-machine-default "$@"; }
-```
-
-Use the same engine for build, run and attach. Do not switch your global default just for this project. The optional helper requires a rootless connection. For a new setup using that helper, create its labelled volumes **before** step 2:
-
-```bash
-p volume create --label io.pi-box.project=pi-box pi-box-workspace
-p volume create --label io.pi-box.project=pi-box pi-box-agent
-```
-
-Creating an existing volume does not relabel or validate it; inspect existing resources before reuse.
 
 ### Optional `pibox` helper
 

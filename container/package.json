@@ -1,0 +1,15 @@
+{
+  "name": "pi-box-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Locked Pi Box runtime with bounded agents and HTTP fetching",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.0.2",
+    "pi-subagents": "0.76.0",
+    "pi-web-access": "0.36.0"
+  },
+  "overrides": {
+    "protobufjs": "7.6.6"
+  }
+}

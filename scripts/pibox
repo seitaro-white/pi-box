@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Host/client convenience only: never build, recreate, or launch Pi.
+# Container stop is allowed only through the explicit stop command.
+set -euo pipefail
+
+fail() { printf 'pibox: %s\n' "$*" >&2; exit 1; }
+usage() {
+  printf '%s\n' \
+    'Usage: pibox up | attach [session] | sessions | stop | help' \
+    '  up        Start the existing Podman VM/container if stopped.' \
+    '  attach    Ensure it is running, then join tmux (default: shell).' \
+    '  sessions  List sessions without starting anything.' \
+    '  stop      End ALL container Pi processes/jobs; keep VM and volumes.' \
+    'Config: ${XDG_CONFIG_HOME:-$HOME/.config}/pibox/config (trusted shell file).' \
+    'See README.md for setup; scripts/pibox supports Mac Podman hosts and SSH clients.'
+}
+
+# Internal SSH recursion guard: the destination must really be a local host.
+require_local=false
+if [[ ${1:-} == --local ]]; then require_local=true; shift; fi
+command=${1:-help}
+case "$command" in
+  help|-h|--help) usage; exit 0 ;;
+  up|sessions|stop) [[ $# == 1 ]] || fail "Unexpected arguments. Run pibox help." ;;
+  attach) [[ $# -le 2 ]] || fail "Expected attach [session]." ;;
+  *) fail "Unknown command: $command. Run pibox help." ;;
+esac
+session=${2:-shell}
+[[ $session =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]] || fail 'Session names must contain only letters, digits, underscores or hyphens, and must not begin with a hyphen.'
+config=${PIBOX_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/pibox/config}
+[[ -f $config && -r $config ]] || fail "Missing config: $config. See docs/commands.md."
+# This is user-owned configuration, not downloaded/project-provided input.
+# shellcheck source=/dev/null
+source "$config"
+mode=${PIBOX_MODE:-}
+[[ $mode == local || $mode == remote ]] || fail 'Set PIBOX_MODE=local or remote in config.'
+if $require_local && [[ $mode != local ]]; then
+  fail 'SSH destination is configured as a remote client; refusing recursion.'
+fi
+
+# Quote each argument for the remote login shell (Bash or zsh), not shell eval.
+shell_quote() {
+  local value=${1//\'/\'\\\'\'}
+  printf "'%s'" "$value"
+}
+if [[ $mode == remote ]]; then
+  host=${PIBOX_SSH_HOST:-macbox}
+  remote_script=${PIBOX_REMOTE_SCRIPT:-}
+  [[ -n $remote_script ]] || fail 'Set PIBOX_REMOTE_SCRIPT to the absolute helper path on the SSH host.'
+  [[ $host =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || fail 'PIBOX_SSH_HOST must be an SSH config name or DNS hostname.'
+  [[ $remote_script == /* && $remote_script != *$'\n'* ]] || fail 'PIBOX_REMOTE_SCRIPT must be an absolute path without newlines.'
+  remote_command="exec $(shell_quote "$remote_script") --local $(shell_quote "$command")"
+  if [[ $command == attach ]]; then remote_command+=" $(shell_quote "$session")"; fi
+  # Bound initial TCP/SSH handshake and detect an established dead connection.
+  # Do not put a total deadline on attach or disable interactive authentication.
+  ssh_args=(-o ForwardAgent=no -o StrictHostKeyChecking=ask
+    -o ConnectTimeout=10 -o ConnectionAttempts=1
+    -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+  if [[ $command == attach ]]; then ssh_args+=(-t); fi
+  printf 'pibox: connecting to %s (10s SSH connection timeout; one attempt).\n' "$host" >&2
+  if ssh "${ssh_args[@]}" "$host" "$remote_command"; then
+    exit 0
+  else
+    status=$?
+    if [[ $status == 255 ]]; then
+      printf 'pibox: SSH connection/login to %s failed (exit 255). Check Tailscale on both laptops, Mac availability and the SSH error above. Do not bypass host-key warnings.\n' "$host" >&2
+      printf 'pibox: No automatic retry. If the connection dropped mid-action, inspect remote state before rerunning it.\n' >&2
+    elif [[ $status != 130 ]]; then
+      printf 'pibox: Remote command exited %s; see the error above.\n' "$status" >&2
+    fi
+    exit "$status"
+  fi
+fi
+
+podman=${PIBOX_PODMAN:-/opt/podman/bin/podman}
+machine=${PIBOX_MACHINE:-podman-machine-default}
+connection=${PIBOX_CONNECTION:-podman-machine-default}
+container=${PIBOX_CONTAINER:-pi-box-dev}
+[[ -x $podman ]] || fail "Podman executable unavailable: $podman"
+for name in "$machine" "$connection" "$container"; do
+  [[ $name =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || fail "Invalid resource name: $name"
+done
+p() { "$podman" --connection "$connection" "$@"; }
+
+state=$("$podman" machine inspect "$machine" --format '{{.State}}') || fail "Cannot inspect existing VM $machine. No VM was created."
+case "$state" in
+  running) ;;
+  stopped)
+    if [[ $command == stop ]]; then
+      printf 'pibox: VM is already stopped; no action taken.\n'
+      exit 0
+    fi
+    [[ $command != sessions ]] || fail 'VM is stopped. Run pibox up first.'
+    printf 'pibox: starting VM %s\n' "$machine" >&2
+    "$podman" machine start "$machine" || fail 'VM startup failed. Inspect Podman Desktop; no reset or retry was attempted.'
+    ;;
+  *) fail "VM state is $state; inspect it before proceeding." ;;
+esac
+[[ $(p info --format '{{.Host.Security.Rootless}}') == true ]] || fail 'Refusing a non-rootless engine.'
+# A missing container is an error, not permission to recreate storage/runtime.
+label=$(p container inspect "$container" --format '{{ index .Config.Labels "io.pi-box.project" }}') || fail "Cannot inspect existing container $container. See docs/local.md."
+[[ $label == pi-box ]] || fail 'Container does not have the pi-box project label.'
+[[ $(p container inspect "$container" --format '{{len .Mounts}}') == 2 ]] || fail 'Expected exactly the two project volumes.'
+[[ $(p container inspect "$container" --format '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Type}}:{{.Name}}{{end}}{{end}}') == volume:pi-box-workspace ]] || fail 'Workspace volume does not match pi-box-workspace.'
+[[ $(p container inspect "$container" --format '{{range .Mounts}}{{if eq .Destination "/home/node/.pi/agent"}}{{.Type}}:{{.Name}}{{end}}{{end}}') == volume:pi-box-agent ]] || fail 'Agent volume does not match pi-box-agent.'
+status=$(p container inspect "$container" --format '{{.State.Status}}')
+if [[ $command == stop ]]; then
+  case "$status" in
+    running)
+      printf 'pibox: WARNING: stopping %s ends ALL its Pi processes, tmux sessions and jobs. VM and volumes are retained.\n' "$container" >&2
+      p stop --time 10 "$container" >/dev/null || fail 'Container stop failed; no retry was attempted.'
+      status=$(p container inspect "$container" --format '{{.State.Status}}')
+      [[ $status == exited || $status == created ]] || fail "Container state after stop is $status; inspect it before retrying."
+      printf 'pibox: %s stopped; VM and persistent files retained.\n' "$container"
+      ;;
+    exited|created) printf 'pibox: %s is already stopped; no action taken.\n' "$container" ;;
+    *) fail "Container state is $status; inspect it before stopping." ;;
+  esac
+  exit 0
+fi
+case "$status" in
+  running) ;;
+  exited|created)
+    [[ $command != sessions ]] || fail 'Container is stopped. Run pibox up first.'
+    # The retained rollback must not run concurrently with the original volumes.
+    for volume in pi-box-workspace pi-box-agent; do
+      users=$(p ps --filter "volume=$volume" --format '{{.Names}}')
+      [[ -z $users ]] || fail "Volume $volume is already used by a running container: $users"
+    done
+    printf 'pibox: starting container %s\n' "$container" >&2
+    p start "$container" >/dev/null
+    ;;
+  *) fail "Container state is $status; refusing to restart or unpause it." ;;
+esac
+case "$command" in
+  up) printf 'pibox: %s is running (no Pi launched).\n' "$container" ;;
+  sessions) p exec "$container" tmux list-sessions ;;
+  attach)
+    names=$(p exec "$container" tmux list-sessions -F '#{session_name}') || fail 'Cannot list tmux sessions. Inspect the container before retrying.'
+    found=false
+    while IFS= read -r name; do
+      if [[ $name == "$session" ]]; then found=true; break; fi
+    done <<< "$names"
+    $found || fail "No tmux session named $session. Run pibox sessions; no new session or Pi was launched."
+    exec "$podman" --connection "$connection" exec -it "$container" tmux attach-session -t "=$session"
+    ;;
+esac

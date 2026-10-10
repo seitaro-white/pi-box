@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, statSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+const dir = mkdtempSync(join(tmpdir(), 'pi-box-init-'));
+const run = () => execFileSync(process.execPath, [resolve('container/init-agent.mjs')], { env: { ...process.env, PI_CODING_AGENT_DIR: dir }, stdio: 'pipe' });
+try {
+  writeFileSync(join(dir, 'auth.json'), 'PRIVATE_TEST_CANARY', { mode: 0o600 });
+  writeFileSync(join(dir, 'settings.json'), JSON.stringify({ defaultModel: 'operator-model', packages: ['operator-package'], subagents: { disableBuiltins: false } }));
+  writeFileSync(join(dir, 'web-search.json'), '{"operator":"preserve"}');
+  mkdirSync(join(dir, 'extensions/subagent'), { recursive: true });
+  writeFileSync(join(dir, 'extensions/subagent/config.json'), '{"timeoutMs":12345}');
+  run();
+  const s = JSON.parse(readFileSync(join(dir, 'settings.json')));
+  assert.equal(s.defaultModel, 'operator-model');
+  assert.equal(s.subagents.disableBuiltins, false);
+  assert.equal(s.packages[0], 'operator-package');
+  assert.equal(s.packages.length, 3);
+  assert.deepEqual(s.subagents, { disableBuiltins: false });
+  assert.equal(readFileSync(join(dir, 'auth.json'), 'utf8'), 'PRIVATE_TEST_CANARY');
+  assert.equal(readFileSync(join(dir, 'web-search.json'), 'utf8'), '{"operator":"preserve"}');
+  assert.equal(readFileSync(join(dir, 'extensions/subagent/config.json'), 'utf8'), '{"timeoutMs":12345}');
+  const before = readFileSync(join(dir, 'settings.json'), 'utf8');
+  const mtime = statSync(join(dir, 'settings.json')).mtimeMs;
+  run();
+  assert.equal(readFileSync(join(dir, 'settings.json'), 'utf8'), before);
+  assert.equal(statSync(join(dir, 'settings.json')).mtimeMs, mtime);
+  writeFileSync(join(dir, 'settings.json'), 'invalid-json');
+  assert.throws(run); // Never overwrite broken operator configuration.
+  rmSync(join(dir, 'settings.json'));
+  rmSync(join(dir, 'web-search.json'));
+  rmSync(join(dir, 'extensions/subagent/config.json'));
+  run();
+  const fresh = JSON.parse(readFileSync(join(dir, 'settings.json')));
+  assert.equal(fresh.packages.length, 2);
+  assert.equal(fresh.subagents, undefined);
+  assert.equal(statSync(join(dir, 'settings.json')).mode & 0o777, 0o600);
+  assert.equal(existsSync(join(dir, 'web-search.json')), false);
+  assert.equal(existsSync(join(dir, 'extensions/subagent/config.json')), false);
+  // Existing per-package resource preferences are operator-owned too.
+  const customPackage = { source: '/opt/pi/node_modules/pi-subagents', prompts: [] };
+  writeFileSync(join(dir, 'settings.json'), JSON.stringify({ packages: [customPackage] }));
+  run();
+  const preserved = JSON.parse(readFileSync(join(dir, 'settings.json')));
+  assert.equal(preserved.packages.length, 2);
+  assert.deepEqual(preserved.packages[0], customPackage);
+  assert.equal(preserved.packages[1], '/opt/pi/node_modules/pi-web-access');
+  console.log('PASS: package wiring, upstream policy defaults, idempotence, auth/config preservation, malformed settings refusal');
+} finally { rmSync(dir, { recursive: true, force: true }); }

@@ -1,0 +1,6 @@
+{
+  "packages": [
+    "/opt/pi/node_modules/pi-subagents",
+    "/opt/pi/node_modules/pi-web-access"
+  ]
+}

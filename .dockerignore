@@ -1,0 +1,11 @@
+# Allowlist: no host config, Git history, credentials, or working repositories.
+**
+!Dockerfile
+!container/
+!container/package.json
+!container/package-lock.json
+!container/entrypoint.sh
+!container/tmux.conf
+!container/init-agent.mjs
+!container/defaults/
+!container/defaults/*.json

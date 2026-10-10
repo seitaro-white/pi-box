@@ -1,0 +1,6 @@
+# Trusted Bash configuration; keep credentials out of this file.
+PIBOX_MODE=local
+PIBOX_PODMAN=/opt/podman/bin/podman
+PIBOX_MACHINE=podman-machine-default
+PIBOX_CONNECTION=podman-machine-default
+PIBOX_CONTAINER=pi-box-dev

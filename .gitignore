@@ -1,0 +1,31 @@
+# Private runtime data and build/test output
+.cache/
+__pycache__/
+# Credential-bearing backups never belong in this repository.
+backups/
+*.tar
+*.tar.gz
+*.dmg
+*.sparsebundle/
+artifacts/
+workspaces/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+node_modules/
+auth.json
+*credentials*.json
+*.pem
+*.key
+
+# Future infrastructure state (dependency lock files remain tracked)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
+backend.hcl

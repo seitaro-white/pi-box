@@ -15,22 +15,22 @@ import sys
 import termios
 import time
 
-binary, connection, name, session = sys.argv[1:]
-podman = [binary, "--connection", connection]
-container = json.loads(subprocess.check_output(podman + ["inspect", name]))[0]
+name, session, *engine = sys.argv[1:]
+assert engine, "container engine command required"
+container = json.loads(subprocess.check_output(engine + ["inspect", name]))[0]
 assert container["Config"]["Labels"].get("io.pi-box.smoke") == name, "not a disposable smoke container"
 assert container["HostConfig"]["NetworkMode"] == "none", "test needs disabled networking"
-assert subprocess.check_output(podman + ["exec", name, "locale", "charmap"]).strip() == b"UTF-8"
+assert subprocess.check_output(engine + ["exec", name, "locale", "charmap"]).strip() == b"UTF-8"
 
 
 def tmux(*args):
-    return subprocess.run(podman + ["exec", name, "tmux", *args], check=True, capture_output=True)
+    return subprocess.run(engine + ["exec", name, "tmux", *args], check=True, capture_output=True)
 
 
 master, slave = pty.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
 client = subprocess.Popen(
-    podman + ["exec", "-it", name, "tmux", "attach-session", "-t", "=" + session],
+    engine + ["exec", "-it", name, "tmux", "attach-session", "-t", "=" + session],
     stdin=slave, stdout=slave, stderr=slave,
 )
 os.close(slave)

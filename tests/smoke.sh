@@ -2,10 +2,14 @@
 # Disposable, credential-free smoke test. Failed resources are kept for diagnosis.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-PODMAN_BIN="${PODMAN_BIN:-/opt/podman/bin/podman}"
-PODMAN_CONNECTION="${PODMAN_CONNECTION:-podman-machine-default}"
-IMAGE="${PI_BOX_IMAGE:-localhost/pi-box:0.2.0}"
-P=("$PODMAN_BIN" --connection "$PODMAN_CONNECTION")
+ENGINE="${PI_BOX_ENGINE:-docker}"
+IMAGE="${PI_BOX_IMAGE:-pi-box:0.2.0}"
+case "$ENGINE" in
+    docker) P=("${DOCKER_BIN:-docker}") ;;
+    podman) P=("${PODMAN_BIN:-/opt/podman/bin/podman}" --connection "${PODMAN_CONNECTION:-podman-machine-default}") ;;
+    *) echo 'PI_BOX_ENGINE must be docker or podman' >&2; exit 1 ;;
+esac
+EXPECTED_PI_VERSION="$(python3 -c 'import json; print(json.load(open("container/package.json"))["dependencies"]["@earendil-works/pi-coding-agent"])')"
 name="pi-box-smoke-$(date +%s)-$$"
 workspace="$name-workspace"
 agent="$name-agent"
@@ -13,11 +17,15 @@ label="io.pi-box.smoke=$name"
 passed=false
 trap 'if [ "$passed" != true ]; then printf "FAILED: inspect retained resources %s, %s, %s\n" "$name" "$workspace" "$agent" >&2; fi' EXIT
 
-[ "$("${P[@]}" info --format '{{.Host.Security.Rootless}}')" = true ]
-"${P[@]}" image exists "$IMAGE"
+"${P[@]}" info >/dev/null
+if [[ $ENGINE == podman ]]; then
+    [ "$("${P[@]}" info --format '{{.Host.Security.Rootless}}')" = true ]
+fi
+"${P[@]}" image inspect "$IMAGE" >/dev/null
 # Unique names; volume create is otherwise idempotent and could reuse old data.
 for volume in "$workspace" "$agent"; do
-    if "${P[@]}" volume exists "$volume"; then
+    existing_volumes="$("${P[@]}" volume ls --format '{{.Name}}')"
+    if grep -Fxq "$volume" <<< "$existing_volumes"; then
         echo "Refusing to reuse $volume" >&2; exit 1
     fi
     "${P[@]}" volume create --label "$label" "$volume" >/dev/null
@@ -36,9 +44,9 @@ launch() {
     "${P[@]}" logs "$name"; echo 'tmux did not become ready' >&2; exit 1
 }
 check_identity() {
-    "${P[@]}" exec "$name" sh -ec '
+    "${P[@]}" exec -e EXPECTED_PI_VERSION="$EXPECTED_PI_VERSION" "$name" sh -ec '
         test "$(id -u)" = 1000
-        test "$(pi --version)" = 1.0.2
+        test "$(pi --version)" = "$EXPECTED_PI_VERSION"
         test "$(node --version)" = v24.21.0
         test "$(uv --version | cut -d " " -f 2)" = 0.12.23
         test "$(python --version)" = "Python 3.13.16"
@@ -124,13 +132,13 @@ for pid in "$pid_a" "$pid_b"; do
 done
 # Exercise real terminal attachment, normal detach, and abrupt client exit.
 # Check the same Pi pane PIDs afterwards; no keys are sent to Pi itself.
-python3 - "$PODMAN_BIN" "$PODMAN_CONNECTION" "$name" <<'PY'
+python3 - "$name" "${P[@]}" <<'PY'
 import fcntl, os, pty, select, struct, subprocess, sys, termios, time
-binary, connection, name = sys.argv[1:]
+name, *command = sys.argv[1:]
 for abrupt in (False, True):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 120, 0, 0))
-    proc = subprocess.Popen([binary, '--connection', connection, 'exec', '-it', name,
+    proc = subprocess.Popen(command + ['exec', '-it', name,
                              'tmux', 'attach-session', '-t', '=repo-a'],
                             stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
     os.close(slave)
@@ -146,7 +154,7 @@ for abrupt in (False, True):
             proc.kill()  # Abruptly disconnect this owned client, not the server.
         else:
             # Server-side detach avoids relying on the client's keyboard protocol.
-            subprocess.run([binary, '--connection', connection, 'exec', name,
+            subprocess.run(command + ['exec', name,
                             'tmux', 'detach-client', '-s', 'repo-a'], check=True)
         deadline = time.monotonic() + 10
         while proc.poll() is None:
@@ -160,7 +168,7 @@ for abrupt in (False, True):
             assert proc.returncode == 0, f'tmux detach failed: {proc.returncode}'
         else:
             # A killed remote client can leave its exec-side tmux client behind.
-            subprocess.run([binary, '--connection', connection, 'exec', name,
+            subprocess.run(command + ['exec', name,
                             'tmux', 'detach-client', '-s', 'repo-a'], check=True)
     finally:
         if proc.poll() is None:
@@ -171,7 +179,7 @@ PY
 [ "$("${P[@]}" exec "$name" tmux display-message -p -t 'repo-a:0.0' '#{pane_pid}')" = "$pid_a" ]
 [ "$("${P[@]}" exec "$name" tmux display-message -p -t 'repo-b:0.0' '#{pane_pid}')" = "$pid_b" ]
 "${P[@]}" exec "$name" tmux list-sessions
-python3 tests/tmux-utf8.py "$PODMAN_BIN" "$PODMAN_CONNECTION" "$name" repo-a
+python3 tests/tmux-utf8.py "$name" repo-a "${P[@]}"
 
 check_data() {
     "${P[@]}" exec "$name" sh -ec '

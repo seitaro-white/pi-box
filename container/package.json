@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Locked Pi Box runtime with bounded agents and HTTP fetching",
+  "description": "Pi Box development runtime with Pi extensions",
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "1.0.2",
+    "@earendil-works/pi-coding-agent": "1.1.0",
     "pi-subagents": "0.76.0",
     "pi-web-access": "0.36.0"
   },

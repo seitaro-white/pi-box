@@ -1,6 +1,0 @@
-# SSH client: no local Podman installation required.
-# Replace the host alias and absolute helper path with your SSH host's values.
-# Trusted Bash configuration; keep credentials out of this file.
-PIBOX_MODE=remote
-PIBOX_SSH_HOST=macbox
-PIBOX_REMOTE_SCRIPT=/absolute/path/on/host/to/pibox

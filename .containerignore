@@ -2,10 +2,13 @@
 **
 !Dockerfile
 !container/
+container/**
 !container/package.json
 !container/package-lock.json
 !container/entrypoint.sh
 !container/tmux.conf
 !container/init-agent.mjs
-!container/defaults/
-!container/defaults/*.json
+!container/prepare-runtime.mjs
+!container/base/
+container/base/**
+!container/base/package-lock.json

@@ -3,7 +3,7 @@
 Lightweight development container built around the [Pi](https://pi.dev) agent harness. Run locally or SSH into the machine hosting it.
 
 Comes installed with:
-- [Pi](https://pi.dev), with pi-subagents and pi-web-access
+- [Pi](https://pi.dev), with pi-subagents, pi-web-access and pi-usage by default (or Pi only)
 - [tmux](https://github.com/tmux/tmux/wiki) for persistent, reconnectable sessions
 - Git, ripgrep and fd
 - Python and uv
@@ -18,8 +18,14 @@ Make sure Docker is installed and running. Start from your **host terminal**, in
 ### 1. Build the image
 
 ```bash
+# Default recommended bundle: Pi + subagents, web access and usage.
 docker build -t pi-box:0.2.0 .
+
+# Alternatively: Pi without bundled third-party extensions.
+docker build --target base -t pi-box:0.2.0-base .
 ```
+
+`recommended` is the default target; `--target recommended` also selects it explicitly. Both variants include the same development tools. Builds store images locally; nothing is published to a registry. Exact Pi/extension versions are declared in [`container/package.json`](container/package.json).
 
 ### 2. Start the container
 
@@ -30,6 +36,8 @@ docker run -d --name pi-box-dev \
   --cap-drop=ALL --security-opt=no-new-privileges \
   pi-box:0.2.0
 ```
+
+For the base variant, use `pi-box:0.2.0-base` instead of `pi-box:0.2.0` in the run command.
 
 Docker creates the named volumes if they don't exist. `/workspace` stores your projects; `/home/node/.pi/agent` stores Pi settings, login and conversation history. The last two options restrict privileges.
 
@@ -107,23 +115,54 @@ The host must stay awake and online, with Tailscale, Docker and the container ru
 
 The container runs as a non-root user, drops Linux capabilities and mounts neither your host home directory nor a container-engine socket. These reduce privileges but are **not a complete agent sandbox**. Pi can access container credentials, mounted data and outbound networking. Extensions use upstream defaults; review their capabilities and resource limits for your workload.
 
-Only `/workspace` and `/home/node/.pi/agent` persist through container replacement. Files and installations elsewhere may disappear. Don't run multiple containers against the same writable volumes. Existing Pi/extension settings are retained when rebuilding; image changes don't reset operator preferences.
+Only `/workspace` and `/home/node/.pi/agent` persist through container replacement. Files and installations elsewhere may disappear. Don't run multiple containers against the same writable volumes. Existing Pi/extension settings are retained when rebuilding; image changes don't reset operator preferences. Startup registers the current image's bundled packages by default and removes obsolete image-owned references when switching variants. It preserves unrelated user-installed packages, credentials, history and resource filters for retained packages. The base image does not disable packages you installed yourself in the persistent volume. Switching to base removes the bundled packages' settings entries, including their resource filters; switching back seeds default registrations.
 
 **Persistent volumes are not backups.** You are responsible for recovery. Volume exports can contain credentials and private conversations; never commit or publicly upload them. Deleting/resetting the container engine's VM can destroy its volumes.
 
+## Updating Pi and extensions
+
+Edit the exact versions in **`container/package.json`**. Pi is the base dependency; every other direct dependency is treated as a bundled Pi package. To add or remove an extension, add or remove its dependency there. Keep exact versions, not `latest`, `^` or `~` ranges.
+
+Regenerate the derived base manifest, package registrations and both lockfiles:
+
+```bash
+node container/prepare-runtime.mjs recommended
+node container/prepare-runtime.mjs base container/base
+npm --prefix container install --package-lock-only --ignore-scripts --no-audit --no-fund
+npm --prefix container/base install --package-lock-only --ignore-scripts --no-audit --no-fund
+```
+
+Do not hand-edit `container/base/package.json` or either `defaults/settings.json`; they are derived from the authoritative manifest. Commit the manifest, generated files and both lockfiles together. Builds derive their manifests/registrations again and use `npm ci` with lifecycle scripts disabled; a mismatched lockfile fails the build. Rebuild both variants and run the tests below before using a new dependency set. This does not update or replace any existing container automatically.
+
 ## Development tests
 
-Host-only configuration tests (no container engine or model calls):
+Run eight focused host tests with Node's built-in runner—no dependency installation, container engine or model calls needed. They cover manifest consistency, fresh defaults, operator-state preservation, variant switching, legacy migration and safe refusal of broken settings:
 
 ```bash
-node tests/init-agent.mjs
+npm test
 ```
 
-After building with Docker:
+After building both variants, explicitly opt into the full integration suite:
 
 ```bash
-bash tests/smoke.sh
+npm run test:integration
 ```
+
+This runs the host tests and both image smoke suites. For different image tags:
+
+```bash
+PI_BOX_BASE_IMAGE=pi-box:my-base \
+PI_BOX_RECOMMENDED_IMAGE=pi-box:my-recommended \
+npm run test:integration
+```
+
+Test organization:
+- `tests/*.test.mjs`: named `node:test` suites; each stateful test has its own temporary directory and automatic cleanup.
+- `tests/fixtures/`: container assertions and synthetic state, kept separate from shell scripts.
+- `tests/helpers/`: shared setup, cleanup and engine selection.
+- `tests/*.sh`: container lifecycle orchestration only. Individual image suites can also be run with `bash tests/smoke.sh` or `PI_BOX_PROFILE=base bash tests/smoke.sh`.
+
+The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage`), image user/permissions and workspace/agent storage across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
 For Podman, select it explicitly and use an image built with that engine:
 
@@ -139,6 +178,6 @@ Adjust the executable and connection for your installation. For Docker outside P
 
 ## Release status
 
-Local release candidate. **Built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.1.0 (2026-10-10).** Tests cover extension loading, two offline Pi sessions, terminal detach/disconnect, Unicode rendering, and restart/replacement persistence. No model calls or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; the new engine-selection path has not been rerun on Podman. AMD64, Linux-host and Windows-host acceptance are pending. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
+Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0 (2026-10-13).** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0 and pi-usage 0.10.13. The current tests cover eight focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and `/usage` registration, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. AMD64, Linux-host and Windows-host acceptance remain pending under issue #4; CI and registry publishing are deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
 
 License choice, dedicated secret scan and publication review are pending. No open-source reuse license has been chosen yet.

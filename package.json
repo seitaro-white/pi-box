@@ -1,0 +1,9 @@
+{
+  "name": "pi-box",
+  "private": true,
+  "description": "Development commands for Pi Box; image dependencies live in container/package.json",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:integration": "bash tests/integration.sh"
+  }
+}

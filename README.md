@@ -15,6 +15,32 @@ This is my personal remote development setup for coding, which I thought I'd sha
 
 Make sure Docker is installed and running. Start from your **host terminal**, in this repository. These commands assume a fresh setup; inspect any existing `pi-box-dev` container or `pi-box-*` volumes before reusing them.
 
+### Everyday commands
+
+From the host terminal in this repository:
+
+```bash
+make up       # Build, check, and replace the container; retain named volumes
+make attach   # Attach separately when ready
+```
+
+Individual steps are available as `make build`, `make check` (read-only), and
+`make replace`. Replacement ends running sessions. It verifies the existing
+volume mounts, saves a regular `~/.gitconfig` in the private agent volume at
+`container-config/gitconfig`, and restores it after replacement. The original
+is not removed before backup succeeds. Symlinked Git config, SSH files, Git
+credential files, and `~/.config/git` still require manual preservation before
+retrying. This is a focused check, not a complete backup: other files
+outside `/workspace` and `/home/node/.pi/agent` will be lost. A stopped existing
+container must be started before the check can run.
+
+Override defaults if needed, for example:
+`make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent`.
+Extra or bind mounts require manual replacement. Do not run lifecycle commands
+concurrently. Attachment remains separate; `make up` does not launch Pi.
+
+The equivalent manual commands follow.
+
 ### 1. Build the image
 
 ```bash
@@ -138,7 +164,7 @@ Do not hand-edit `container/base/package.json` or either `defaults/settings.json
 
 ## Development tests
 
-Run eight focused host tests with Node's built-in runner—no dependency installation, container engine or model calls needed. They cover manifest consistency, fresh defaults, operator-state preservation, variant switching, legacy migration and safe refusal of broken settings:
+Run focused host tests with Node's built-in runner—no dependency installation, container engine or model calls needed. They cover manifest consistency, fresh defaults, operator-state preservation, variant switching, legacy migration and safe refusal of broken settings:
 
 ```bash
 npm test
@@ -181,5 +207,5 @@ Adjust the executable and connection for your installation. For Docker outside P
 ## Release status
 
 Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0 (2026-10-13).** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0 and pi-usage 0.10.13. The current tests cover eight focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and `/usage` registration, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. AMD64, Linux-host and Windows-host acceptance remain pending under issue #4; CI and registry publishing are deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
-
+sd
 License choice, dedicated secret scan and publication review are pending. No open-source reuse license has been chosen yet.

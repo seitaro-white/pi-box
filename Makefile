@@ -1,4 +1,4 @@
-.PHONY: build check replace attach up versions
+.PHONY: build runtime check replace attach up versions
 
 IMAGE ?= pi-box:0.2.0
 CONTAINER ?= pi-box-dev
@@ -7,8 +7,15 @@ AGENT_VOLUME ?= pi-box-agent
 GIT_VOLUME ?= pi-box-git
 export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME
 
-build:
+# Refresh derived runtime files before Docker copies them into the image.
+build: runtime
 	docker build -t "$(IMAGE)" .
+
+runtime:
+	node container/prepare-runtime.mjs recommended
+	node container/prepare-runtime.mjs base container/base
+	npm --prefix container install --package-lock-only --ignore-scripts --no-audit --no-fund
+	npm --prefix container/base install --package-lock-only --ignore-scripts --no-audit --no-fund
 
 versions:
 	node scripts/check-versions.mjs

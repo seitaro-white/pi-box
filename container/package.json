@@ -8,9 +8,6 @@
     "@earendil-works/pi-coding-agent": "1.2.0",
     "pi-subagents": "0.78.0",
     "pi-web-access": "0.40.0",
-    "@sreetej510/pi-usage": "0.10.13"
-  },
-  "overrides": {
-    "protobufjs": "7.6.6"
+    "@narumitw/pi-usage": "0.66.0"
   }
 }

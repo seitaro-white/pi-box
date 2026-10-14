@@ -2,6 +2,6 @@
   "packages": [
     "/opt/pi/node_modules/pi-subagents",
     "/opt/pi/node_modules/pi-web-access",
-    "/opt/pi/node_modules/@sreetej510/pi-usage"
+    "/opt/pi/node_modules/@narumitw/pi-usage"
   ]
 }

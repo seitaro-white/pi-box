@@ -82,7 +82,7 @@ test(
     }
     assert.equal(
       loaded.some((extension) => extension.commands.has("usage")),
-      bundled.has("@sreetej510/pi-usage"),
+      bundled.has("@narumitw/pi-usage"),
       "/usage command",
     );
     assert.deepEqual(errors, []);

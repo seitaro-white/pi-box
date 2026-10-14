@@ -17,7 +17,8 @@ Make sure Docker is installed and running. Start from your **host terminal**, in
 
 ### Everyday commands
 
-From the host terminal in this repository:
+From the host terminal in this repository (requires Node.js 18+ and Make on
+the host, in addition to Docker):
 
 ```bash
 make up       # Build, check, and replace the container; retain named volumes
@@ -27,25 +28,25 @@ make attach   # Attach separately when ready
 Individual steps are available as `make build`, `make check` (read-only), and
 `make replace`. Replacement ends running sessions. It verifies the existing
 volume mounts and refuses to discard the normal container user's non-persistent
-Git files or SSH keys by default. It does not inspect root's home directory. Git settings and HTTPS credentials now live directly in a third volume
+Git files or SSH keys. It does not inspect root's home directory.
+Git settings and HTTPS credentials live directly in a third volume
 at `/home/node/.config/git`; there is no per-replacement backup/restore.
 This is a focused check, not a complete backup: files outside the three mounted
 directories will be lost. A stopped existing container must be started before
 the check can run.
 
-**Older containers:** there is no automatic migration. If you are happy to reset
-Git settings and enter your PAT again, run
-`make up RESET_LEGACY_GIT=1`. This explicitly allows disposable `~/.gitconfig`,
-`~/.git-credentials`, and an unmounted `~/.config/git` to be discarded with the
-old container. It never bypasses SSH-key checks or deletes persistent volumes.
-The previous agent-volume backup (`container-config/gitconfig`) is no longer
-used and remains untouched. Resetting storage does not revoke old tokens;
-revoke any unwanted tokens in GitHub yourself.
+Replacement requires all three documented volume mounts. There is no migration
+or reset mode; containers with different mounts must be handled manually.
 
 Override defaults if needed, for example:
 `make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent GIT_VOLUME=my-git`.
 Extra or bind mounts require manual replacement. Do not run lifecycle commands
 concurrently. Attachment remains separate; `make up` does not launch Pi.
+
+The Makefile calls `scripts/dev-container.mjs`, a Node.js ES-module script.
+It uses Docker's JSON inspection output for checks and passes the small
+`scripts/check-disposable-files.sh` file to the container's shell for file checks.
+The manual Docker commands below do not require Node.js on the host.
 
 The equivalent manual commands follow.
 
@@ -138,8 +139,7 @@ repository URL may prompt again. Expired or revoked PATs still need replacement.
 Personal settings override image defaults using Git's normal config layers.
 To replace the default helper, first reset the inherited helper list with
 `git config --global credential.helper ""`, then add your chosen helper with
-`git config --global --add credential.helper HELPER`. Existing settings from
-the previous startup-seeded configuration are also retained.
+`git config --global --add credential.helper HELPER`.
 
 **Tokens are stored as plaintext.** The directory is restricted to its owner
 (mode 700), and config/credential files use mode 600. Pi and other processes

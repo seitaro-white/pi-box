@@ -5,9 +5,7 @@ CONTAINER ?= pi-box-dev
 WORKSPACE_VOLUME ?= pi-box-workspace
 AGENT_VOLUME ?= pi-box-agent
 GIT_VOLUME ?= pi-box-git
-# Explicitly discard disposable Git files in an older two-volume container.
-RESET_LEGACY_GIT ?= 0
-export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME RESET_LEGACY_GIT
+export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME
 
 build:
 	docker build -t "$(IMAGE)" .
@@ -16,13 +14,13 @@ versions:
 	node scripts/check-versions.mjs
 
 check:
-	bash scripts/dev-container.sh check
+	node scripts/dev-container.mjs check
 
 replace:
-	bash scripts/dev-container.sh replace
+	node scripts/dev-container.mjs replace
 
 attach:
-	bash scripts/dev-container.sh attach
+	node scripts/dev-container.mjs attach
 
 # Recursive calls keep these steps sequential, even with make -j.
 up:

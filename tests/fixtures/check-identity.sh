@@ -16,4 +16,4 @@ test "$GIT_CONFIG_GLOBAL" = /home/node/.config/git/config
 test -w /home/node/.config/git
 test "$(stat -c %a /home/node/.config/git)" = 700
 test "$(stat -c %a "$GIT_CONFIG_GLOBAL")" = 600
-test "$(git config --global --get credential.https://github.com.useHttpPath)" = true
+test "$(git config --get credential.https://github.com.useHttpPath)" = true

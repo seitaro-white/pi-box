@@ -20,6 +20,7 @@ ENV UV_PYTHON_INSTALL_DIR=/home/node/.pi/agent/python \
 
 COPY container/entrypoint.sh /usr/local/bin/pi-box-entrypoint
 COPY container/tmux.conf /etc/tmux.conf
+COPY container/gitconfig /etc/gitconfig
 COPY container/init-agent.mjs container/init-git.mjs container/prepare-runtime.mjs /opt/pi/
 RUN chmod 0755 /usr/local/bin/pi-box-entrypoint \
     && install -d -m 0700 -o node -g node /workspace /home/node/.pi /home/node/.pi/agent \

@@ -32,7 +32,7 @@ check() {
   [[ "$running" == true ]] || fail "Start $CONTAINER first so its non-persistent files can be checked."
   docker exec -e HAS_GIT_VOLUME="$git" -e RESET_LEGACY_GIT="$RESET_LEGACY_GIT" "$CONTAINER" sh -c '
     set -eu
-    for path in /home/node/.gitconfig /home/node/.git-credentials /home/node/.config/git /home/node/.ssh /root/.gitconfig /root/.ssh /root/.git-credentials; do
+    for path in /home/node/.gitconfig /home/node/.git-credentials /home/node/.config/git /home/node/.ssh; do
       [ "$path" != /home/node/.config/git ] || [ "$HAS_GIT_VOLUME" != 1 ] || continue
       if [ -e "$path" ] || [ -L "$path" ]; then
         case "$path" in
@@ -63,7 +63,6 @@ wait_for_startup() {
 case "${1:-}" in
   check) check ;;
   replace)
-    docker image inspect "$IMAGE" >/dev/null
     docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$IMAGE" |
       grep -Fxq 'GIT_CONFIG_GLOBAL=/home/node/.config/git/config' ||
       fail "Image does not support the Git volume. Run make build first."

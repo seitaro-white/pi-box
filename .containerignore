@@ -7,6 +7,7 @@ container/**
 !container/package-lock.json
 !container/entrypoint.sh
 !container/tmux.conf
+!container/gitconfig
 !container/init-agent.mjs
 !container/init-git.mjs
 !container/prepare-runtime.mjs

@@ -26,8 +26,8 @@ make attach   # Attach separately when ready
 
 Individual steps are available as `make build`, `make check` (read-only), and
 `make replace`. Replacement ends running sessions. It verifies the existing
-volume mounts and refuses to discard non-persistent Git files or SSH keys by
-default. Git settings and HTTPS credentials now live directly in a third volume
+volume mounts and refuses to discard the normal container user's non-persistent
+Git files or SSH keys by default. It does not inspect root's home directory. Git settings and HTTPS credentials now live directly in a third volume
 at `/home/node/.config/git`; there is no per-replacement backup/restore.
 This is a focused check, not a complete backup: files outside the three mounted
 directories will be lost. A stopped existing container must be started before
@@ -126,14 +126,20 @@ read/write for pushing, with an expiration. Organizations may require approval.
 Never put a token in a command, clone URL, repository file, or chat transcript.
 No GitHub CLI is required.
 
-`GIT_CONFIG_GLOBAL` points to `/home/node/.config/git/config`. On first startup,
-the container seeds a Git credential-store helper using
-`/home/node/.config/git/credentials`. A successful authenticated HTTPS operation
-saves the credential there; settings and saved credentials survive restart and
-replacement when the same Git volume is reused. GitHub credentials are matched
-by repository path, so a different repository URL may prompt again. Existing
-config and helper choices are retained on later starts. Expired or revoked PATs
-still need replacement.
+`GIT_CONFIG_GLOBAL` points to `/home/node/.config/git/config`. The image supplies
+a credential-store helper in `/etc/gitconfig` using
+`/home/node/.config/git/credentials`. Startup only prepares private storage; it
+does not rewrite your settings or require valid Git config to start tmux.
+A successful authenticated HTTPS operation saves the credential there; settings
+and saved credentials survive restart and replacement when the same Git volume
+is reused. GitHub credentials are matched by repository path, so a different
+repository URL may prompt again. Expired or revoked PATs still need replacement.
+
+Personal settings override image defaults using Git's normal config layers.
+To replace the default helper, first reset the inherited helper list with
+`git config --global credential.helper ""`, then add your chosen helper with
+`git config --global --add credential.helper HELPER`. Existing settings from
+the previous startup-seeded configuration are also retained.
 
 **Tokens are stored as plaintext.** The directory is restricted to its owner
 (mode 700), and config/credential files use mode 600. Pi and other processes

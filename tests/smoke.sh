@@ -16,16 +16,17 @@ EXPECTED_DEPENDENCIES_JSON="$(node -p 'JSON.stringify(require("./container/packa
 name="pi-box-smoke-$(date +%s)-$$"
 workspace="$name-workspace"
 agent="$name-agent"
+git_volume="$name-git"
 label="io.pi-box.smoke=$name"
 passed=false
-trap 'if [ "$passed" != true ]; then printf "FAILED: inspect retained resources %s, %s, %s\n" "$name" "$workspace" "$agent" >&2; fi' EXIT
+trap 'if [ "$passed" != true ]; then printf "FAILED: inspect retained resources %s, %s, %s, %s\n" "$name" "$workspace" "$agent" "$git_volume" >&2; fi' EXIT
 
 "${P[@]}" info >/dev/null
 if [[ $ENGINE == podman ]]; then
     [ "$("${P[@]}" info --format '{{.Host.Security.Rootless}}')" = true ]
 fi
 "${P[@]}" image inspect "$IMAGE" >/dev/null
-for volume in "$workspace" "$agent"; do
+for volume in "$workspace" "$agent" "$git_volume"; do
     existing_volumes="$("${P[@]}" volume ls --format '{{.Name}}')"
     if grep -Fxq "$volume" <<< "$existing_volumes"; then
         echo "Refusing to reuse $volume" >&2; exit 1
@@ -47,6 +48,7 @@ launch() {
     "${P[@]}" run -d --name "$name" --label "$label" \
         --cap-drop=ALL --security-opt=no-new-privileges --network=none \
         -v "$workspace:/workspace" -v "$agent:/home/node/.pi/agent" \
+        -v "$git_volume:/home/node/.config/git" \
         "$IMAGE" >/dev/null
     wait_for_startup
 }
@@ -74,6 +76,6 @@ for transition in restart replacement; do
 done
 
 "${P[@]}" rm --force "$name" >/dev/null
-"${P[@]}" volume rm "$workspace" "$agent" >/dev/null
+"${P[@]}" volume rm "$workspace" "$agent" "$git_volume" >/dev/null
 passed=true
 printf 'PASS: %s image: startup, pins, extension registration, permissions and restart/replacement persistence. No model calls.\n' "$PROFILE"

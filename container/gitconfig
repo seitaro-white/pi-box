@@ -1,0 +1,7 @@
+# Image defaults; personal overrides live in the persistent Git volume.
+[credential]
+	# Reset inherited helpers before selecting this volume's credential store.
+	helper =
+	helper = store --file=/home/node/.config/git/credentials
+[credential "https://github.com"]
+	useHttpPath = true

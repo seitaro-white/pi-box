@@ -121,6 +121,8 @@ Only `/workspace` and `/home/node/.pi/agent` persist through container replaceme
 
 ## Updating Pi and extensions
 
+Run `make versions` to compare the pinned Pi, extension and override versions with npm's `latest` dist-tags (requires Node.js, npm and registry access). This is read-only; lookup failures produce a nonzero exit status. A different version is not necessarily newer or compatible.
+
 Edit the exact versions in **`container/package.json`**. Pi is the base dependency; every other direct dependency is treated as a bundled Pi package. To add or remove an extension, add or remove its dependency there. Keep exact versions, not `latest`, `^` or `~` ranges.
 
 Regenerate the derived base manifest, package registrations and both lockfiles:

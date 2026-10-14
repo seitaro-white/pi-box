@@ -8,6 +8,7 @@ container/**
 !container/entrypoint.sh
 !container/tmux.conf
 !container/init-agent.mjs
+!container/init-git.mjs
 !container/prepare-runtime.mjs
 !container/base/
 container/base/**

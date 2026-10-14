@@ -4,7 +4,10 @@ IMAGE ?= pi-box:0.2.0
 CONTAINER ?= pi-box-dev
 WORKSPACE_VOLUME ?= pi-box-workspace
 AGENT_VOLUME ?= pi-box-agent
-export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME
+GIT_VOLUME ?= pi-box-git
+# Explicitly discard disposable Git files in an older two-volume container.
+RESET_LEGACY_GIT ?= 0
+export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME RESET_LEGACY_GIT
 
 build:
 	docker build -t "$(IMAGE)" .

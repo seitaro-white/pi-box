@@ -11,4 +11,11 @@ test(`${process.env.STORAGE_TRANSITION}: workspace and private agent state persi
   const auth = '/home/node/.pi/agent/auth.json';
   assert.deepEqual(JSON.parse(readFileSync(auth, 'utf8')), {});
   assert.equal(statSync(auth).mode & 0o777, 0o600);
+  assert.equal(execFileSync('git', ['config', '--global', 'user.email'], { encoding: 'utf8' }).trim(), 'synthetic@example.invalid');
+  const credential = execFileSync('git', ['credential', 'fill'], {
+    input: 'protocol=https\nhost=github.com\npath=synthetic/repo.git\n\n', encoding: 'utf8',
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  });
+  assert.match(credential, /password=SYNTHETIC_NOT_A_REAL_TOKEN/);
+  assert.equal(statSync('/home/node/.config/git/credentials').mode & 0o777, 0o600);
 });

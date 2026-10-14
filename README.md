@@ -26,16 +26,24 @@ make attach   # Attach separately when ready
 
 Individual steps are available as `make build`, `make check` (read-only), and
 `make replace`. Replacement ends running sessions. It verifies the existing
-volume mounts, saves a regular `~/.gitconfig` in the private agent volume at
-`container-config/gitconfig`, and restores it after replacement. The original
-is not removed before backup succeeds. Symlinked Git config, SSH files, Git
-credential files, and `~/.config/git` still require manual preservation before
-retrying. This is a focused check, not a complete backup: other files
-outside `/workspace` and `/home/node/.pi/agent` will be lost. A stopped existing
-container must be started before the check can run.
+volume mounts and refuses to discard non-persistent Git files or SSH keys by
+default. Git settings and HTTPS credentials now live directly in a third volume
+at `/home/node/.config/git`; there is no per-replacement backup/restore.
+This is a focused check, not a complete backup: files outside the three mounted
+directories will be lost. A stopped existing container must be started before
+the check can run.
+
+**Older containers:** there is no automatic migration. If you are happy to reset
+Git settings and enter your PAT again, run
+`make up RESET_LEGACY_GIT=1`. This explicitly allows disposable `~/.gitconfig`,
+`~/.git-credentials`, and an unmounted `~/.config/git` to be discarded with the
+old container. It never bypasses SSH-key checks or deletes persistent volumes.
+The previous agent-volume backup (`container-config/gitconfig`) is no longer
+used and remains untouched. Resetting storage does not revoke old tokens;
+revoke any unwanted tokens in GitHub yourself.
 
 Override defaults if needed, for example:
-`make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent`.
+`make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent GIT_VOLUME=my-git`.
 Extra or bind mounts require manual replacement. Do not run lifecycle commands
 concurrently. Attachment remains separate; `make up` does not launch Pi.
 
@@ -59,13 +67,14 @@ docker build --target base -t pi-box:0.2.0-base .
 docker run -d --name pi-box-dev \
   -v pi-box-workspace:/workspace \
   -v pi-box-agent:/home/node/.pi/agent \
+  -v pi-box-git:/home/node/.config/git \
   --cap-drop=ALL --security-opt=no-new-privileges \
   pi-box:0.2.0
 ```
 
 For the base variant, use `pi-box:0.2.0-base` instead of `pi-box:0.2.0` in the run command.
 
-Docker creates the named volumes if they don't exist. `/workspace` stores your projects; `/home/node/.pi/agent` stores Pi settings, login and conversation history. The last two options restrict privileges.
+Docker creates the named volumes if they don't exist. `/workspace` stores your projects; `/home/node/.pi/agent` stores Pi settings, login and conversation history; `/home/node/.config/git` stores global Git settings and saved HTTPS credentials. The last two options restrict privileges. The image prepares these directories for the non-root user; an existing volume with incompatible ownership requires manual repair.
 
 ### 3. Open a container shell, attach to tmux, and start Pi
 
@@ -98,6 +107,39 @@ docker exec -it pi-box-dev tmux attach-session -t '=shell'
 ```
 
 This returns to the existing session—if Pi is already running there, don't start another instance. For VS Code, use **Dev Containers: Attach to Running Container…**.
+
+## Git setup and private repositories
+
+Inside the container, configure your identity once:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+git clone https://github.com/OWNER/REPO.git
+```
+
+For a private repository, enter your GitHub username and a **scoped personal
+access token** at the password prompt, not your account password. Create a
+[fine-grained PAT](https://github.com/settings/personal-access-tokens/new) for
+only the repositories you need: Contents read-only for cloning/pulling, or
+read/write for pushing, with an expiration. Organizations may require approval.
+Never put a token in a command, clone URL, repository file, or chat transcript.
+No GitHub CLI is required.
+
+`GIT_CONFIG_GLOBAL` points to `/home/node/.config/git/config`. On first startup,
+the container seeds a Git credential-store helper using
+`/home/node/.config/git/credentials`. A successful authenticated HTTPS operation
+saves the credential there; settings and saved credentials survive restart and
+replacement when the same Git volume is reused. GitHub credentials are matched
+by repository path, so a different repository URL may prompt again. Existing
+config and helper choices are retained on later starts. Expired or revoked PATs
+still need replacement.
+
+**Tokens are stored as plaintext.** The directory is restricted to its owner
+(mode 700), and config/credential files use mode 600. Pi and other processes
+running as the same container user—and anyone with host Docker access—can still
+read them. Do not publish or commit volume backups. SSH keys and SSH Git
+authentication are separate and are not persisted by this volume.
 
 ## Optional — remote access with Tailscale and SSH
 
@@ -141,7 +183,7 @@ The host must stay awake and online, with Tailscale, Docker and the container ru
 
 The container runs as a non-root user, drops Linux capabilities and mounts neither your host home directory nor a container-engine socket. These reduce privileges but are **not a complete agent sandbox**. Pi can access container credentials, mounted data and outbound networking. Extensions use upstream defaults; review their capabilities and resource limits for your workload.
 
-Only `/workspace` and `/home/node/.pi/agent` persist through container replacement. Files and installations elsewhere may disappear. Don't run multiple containers against the same writable volumes. Existing Pi/extension settings are retained when rebuilding; image changes don't reset operator preferences. Startup registers the current image's bundled packages by default and removes obsolete image-owned references when switching variants. It preserves unrelated user-installed packages, credentials, history and resource filters for retained packages. The base image does not disable packages you installed yourself in the persistent volume. Switching to base removes the bundled packages' settings entries, including their resource filters; switching back seeds default registrations.
+Only `/workspace`, `/home/node/.pi/agent`, and `/home/node/.config/git` persist through container replacement with the documented mounts. Files and installations elsewhere may disappear. Don't run multiple containers against the same writable volumes. Existing Pi/extension settings are retained when rebuilding; image changes don't reset operator preferences. Startup registers the current image's bundled packages by default and removes obsolete image-owned references when switching variants. It preserves unrelated user-installed packages, credentials, history and resource filters for retained packages. The base image does not disable packages you installed yourself in the persistent volume. Switching to base removes the bundled packages' settings entries, including their resource filters; switching back seeds default registrations.
 
 **Persistent volumes are not backups.** You are responsible for recovery. Volume exports can contain credentials and private conversations; never commit or publicly upload them. Deleting/resetting the container engine's VM can destroy its volumes.
 
@@ -190,7 +232,7 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/*.sh`: container lifecycle orchestration only. Individual image suites can also be run with `bash tests/smoke.sh` or `PI_BOX_PROFILE=base bash tests/smoke.sh`.
 
-The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage`), image user/permissions and workspace/agent storage across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
+The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage`), image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
 For Podman, select it explicitly and use an image built with that engine:
 

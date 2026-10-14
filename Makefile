@@ -5,7 +5,9 @@ CONTAINER ?= pi-box-dev
 WORKSPACE_VOLUME ?= pi-box-workspace
 AGENT_VOLUME ?= pi-box-agent
 GIT_VOLUME ?= pi-box-git
-export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME
+# Recommended image only; set empty to disable Plannotator port publishing.
+PLANNOTATOR_HOST_PORT ?= 19432
+export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME PLANNOTATOR_HOST_PORT
 
 # Refresh derived runtime files before Docker copies them into the image.
 build: runtime

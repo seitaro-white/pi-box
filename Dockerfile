@@ -64,6 +64,11 @@ RUN node prepare-runtime.mjs recommended \
     && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
     && npm cache clean --force \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi
-ENV PI_BOX_PROFILE=recommended
+# Bind inside the container for Docker forwarding; publish only on host loopback.
+# Remote mode prints the review URL instead of opening a container browser.
+ENV PI_BOX_PROFILE=recommended \
+    PLANNOTATOR_REMOTE=1 \
+    PLANNOTATOR_PORT=19432
+EXPOSE 19432
 USER node
 WORKDIR /workspace

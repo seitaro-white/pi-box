@@ -7,7 +7,11 @@ import { agentState } from "./helpers/agent-state.mjs";
 
 const defaults = readJson(join(root, "container/defaults/settings.json")).packages;
 const operatorPackage = { source: "npm:operator-package@1.0.0", extensions: [] };
-const policyFiles = ["web-search.json", "extensions/subagent/config.json"];
+const policyFiles = [
+  "web-search.json",
+  "extensions/subagent/config.json",
+  "plannotator.json",
+];
 
 /** Seed personal settings, policy and synthetic secrets that startup must retain. */
 function seedOperatorState(state) {

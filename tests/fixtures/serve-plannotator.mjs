@@ -1,4 +1,4 @@
-// Used only in a disposable, credential-free container by smoke.sh.
+// Used only in a disposable, credential-free container by smoke.mjs.
 import { readFileSync } from "node:fs";
 import { createJiti } from "/opt/pi/node_modules/jiti/lib/jiti.mjs";
 

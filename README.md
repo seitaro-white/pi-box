@@ -18,10 +18,10 @@ Make sure Docker is installed and running. Start from your **host terminal**, in
 ### Everyday commands
 
 From the host terminal in this repository (requires Node.js 18+ and Make on
-the host, in addition to Docker):
+the host, plus npm and Docker):
 
 ```bash
-make up       # Build, check, and replace the container; retain named volumes
+make up       # Refresh runtime, build, check, and replace; retain named volumes
 make attach   # Attach separately when ready
 ```
 
@@ -52,7 +52,8 @@ stays `19432`. The base image does not publish a Plannotator port.
 The Makefile calls `scripts/dev-container.mjs`, a Node.js ES-module script.
 It uses Docker's JSON inspection output for checks and passes the small
 `scripts/check-disposable-files.sh` file to the container's shell for file checks.
-The manual Docker commands below do not require Node.js on the host.
+The manual Docker commands below use the checked-in runtime files and do not
+require Node.js on the host. After editing dependencies, use `make runtime` first.
 
 The equivalent manual commands follow.
 
@@ -250,16 +251,25 @@ Run `make versions` to compare the pinned Pi, extension and override versions wi
 
 Edit the exact versions in **`container/package.json`**. Pi is the base dependency; every other direct dependency is treated as a bundled Pi package. To add or remove an extension, add or remove its dependency there. Keep exact versions, not `latest`, `^` or `~` ranges.
 
-Regenerate the derived base manifest, package registrations and both lockfiles:
+Then run:
 
 ```bash
-node container/prepare-runtime.mjs recommended
-node container/prepare-runtime.mjs base container/base
-npm --prefix container install --package-lock-only --ignore-scripts --no-audit --no-fund
-npm --prefix container/base install --package-lock-only --ignore-scripts --no-audit --no-fund
+make build    # Regenerate runtime files and lockfiles, then build the image
+# Or: make up — also replace the development container afterward
 ```
 
-Do not hand-edit `container/base/package.json` or either `defaults/settings.json`; they are derived from the authoritative manifest. Commit the manifest, generated files and both lockfiles together. Builds derive their manifests/registrations again and use `npm ci` with lifecycle scripts disabled; a mismatched lockfile fails the build. Rebuild both variants and run the tests below before using a new dependency set. This does not update or replace any existing container automatically.
+`make build` always runs `make runtime` first, regenerating the base manifest,
+package registrations and both lockfiles from `container/package.json`. It
+requires host npm and may need registry access. Exact direct versions remain
+pinned; unchanged locked dependencies are retained, not indiscriminately updated.
+Run `make runtime` alone to regenerate without building an image.
+
+Do not hand-edit `container/base/package.json`, either `defaults/settings.json`,
+or the lockfiles. Commit the manifest, generated files and both lockfiles
+together. Direct `docker build` uses the current lockfiles and still runs
+`npm ci` with lifecycle scripts disabled; it refuses mismatched dependencies.
+Rebuild both variants and run the tests below before using a new dependency set.
+`make build` does not replace an existing container; `make up` does.
 
 ## Development tests
 

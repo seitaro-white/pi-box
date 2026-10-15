@@ -3,7 +3,7 @@
 Lightweight development container built around the [Pi](https://pi.dev) agent harness. Run locally or SSH into the machine hosting it.
 
 Comes installed with:
-- [Pi](https://pi.dev), with pi-subagents, pi-web-access and pi-usage by default (or Pi only)
+- [Pi](https://pi.dev), with pi-subagents, pi-web-access, pi-usage and Plannotator by default (or Pi only)
 - [tmux](https://github.com/tmux/tmux/wiki) for persistent, reconnectable sessions
 - Git, ripgrep and fd
 - Python and uv
@@ -43,6 +43,12 @@ Override defaults if needed, for example:
 Extra or bind mounts require manual replacement. Do not run lifecycle commands
 concurrently. Attachment remains separate; `make up` does not launch Pi.
 
+For the recommended image, replacement publishes Plannotator on host loopback
+only (`127.0.0.1:19432` → container port `19432`). Use
+`make replace PLANNOTATOR_HOST_PORT=29432` for a different host port, or
+`make replace PLANNOTATOR_HOST_PORT=` to disable publishing. The container's port
+stays `19432`. The base image does not publish a Plannotator port.
+
 The Makefile calls `scripts/dev-container.mjs`, a Node.js ES-module script.
 It uses Docker's JSON inspection output for checks and passes the small
 `scripts/check-disposable-files.sh` file to the container's shell for file checks.
@@ -53,7 +59,7 @@ The equivalent manual commands follow.
 ### 1. Build the image
 
 ```bash
-# Default recommended bundle: Pi + subagents, web access and usage.
+# Default recommended bundle: Pi + subagents, web access, usage and Plannotator.
 docker build -t pi-box:0.2.0 .
 
 # Alternatively: Pi without bundled third-party extensions.
@@ -70,12 +76,15 @@ docker run -d --name pi-box-dev \
   -v pi-box-agent:/home/node/.pi/agent \
   -v pi-box-git:/home/node/.config/git \
   --cap-drop=ALL --security-opt=no-new-privileges \
+  -p 127.0.0.1:19432:19432 \
   pi-box:0.2.0
 ```
 
-For the base variant, use `pi-box:0.2.0-base` instead of `pi-box:0.2.0` in the run command.
+For the base variant, use `pi-box:0.2.0-base` instead of `pi-box:0.2.0` and omit
+`-p 127.0.0.1:19432:19432`. Publishing is also optional for recommended if you
+do not need browser reviews.
 
-Docker creates the named volumes if they don't exist. `/workspace` stores your projects; `/home/node/.pi/agent` stores Pi settings, login and conversation history; `/home/node/.config/git` stores global Git settings and saved HTTPS credentials. The last two options restrict privileges. The image prepares these directories for the non-root user; an existing volume with incompatible ownership requires manual repair.
+Docker creates the named volumes if they don't exist. `/workspace` stores your projects; `/home/node/.pi/agent` stores Pi settings, login and conversation history; `/home/node/.config/git` stores global Git settings and saved HTTPS credentials. `--cap-drop` and `--security-opt` restrict privileges. The image prepares these directories for the non-root user; an existing volume with incompatible ownership requires manual repair.
 
 ### 3. Open a container shell, attach to tmux, and start Pi
 
@@ -167,21 +176,63 @@ On Linux, enable your distribution's OpenSSH server. Use the host's normal SSH a
 
 This guide uses **ordinary SSH over Tailscale**, not the separate **Tailscale SSH** feature. No SSH server inside the container or public router port forwarding is needed. See [Tailscale's connection guide](https://tailscale.com/kb/1452/connect-to-devices) for networking details.
 
-### 3. Connect and attach
+### 3. One-time laptop setup for Plannotator (recommended image)
 
-From your laptop, replacing the placeholders with the host's account and Tailscale address:
+On the **client laptop**, add an entry to `~/.ssh/config`, replacing the placeholders:
 
-```bash
-ssh USER@HOST_TAILSCALE_ADDRESS
+```sshconfig
+Host macbox
+    HostName YOUR_HOST_TAILSCALE_ADDRESS
+    User YOUR_HOST_USERNAME
+    LocalForward 127.0.0.1:19432 127.0.0.1:19432
+    ExitOnForwardFailure yes
 ```
 
-Then, in the host's SSH shell:
+Already using `ssh macbox`? Keep your existing entry and add only the
+`LocalForward` and `ExitOnForwardFailure` lines. No Plannotator installation is
+needed on the laptop—just SSH and a browser. The base image needs no forwarding.
+
+### 4. Connect, attach and open reviews
+
+From your laptop:
+
+```bash
+ssh macbox
+```
+
+Then, in the host's SSH shell, attach as usual:
 
 ```bash
 docker exec -it pi-box-dev tmux attach-session -t '=shell'
 ```
 
-Detach with **Ctrl+B, then D**, and run `exit` to close SSH. Pi continues on the host. Reconnect with the same commands.
+Inside Pi, run `/plannotator-plan-mode` (or start with `pi --plan`). Once a plan
+is submitted, click its link to open `http://localhost:19432` in your **laptop's
+browser**; it does not open automatically. Keep SSH connected—nothing extra is
+needed per review. `/plannotator-review`, `/plannotator-annotate FILE.md` and
+`/plannotator-last` work the same way.
+
+Detach with **Ctrl+B, then D**, then `exit` to close SSH. Pi continues on the
+host. For local use, open the same URL on the Docker host without a tunnel.
+
+The port only answers while a review is open. Finish one before opening another:
+port `19432` is shared by Pi sessions. Upstream remote mode
+(`PLANNOTATOR_REMOTE=1`) disables live-app annotation and Ask this session.
+
+#### Custom ports and troubleshooting
+
+- For host port `29432`, change the second address in `LocalForward` to
+  `127.0.0.1:29432`; the laptop URL stays unchanged.
+- If the laptop's port is busy, change the first address's port and use it in
+  the browser URL. Reconnect SSH after changing its configuration.
+- Check SSH errors, host TCP-forwarding permissions, `docker port pi-box-dev`,
+  and that a review is open. New Docker port mappings require container
+  replacement, not just an image rebuild.
+
+**Keep Docker publishing bound to `127.0.0.1`, not `-p 19432:19432`.** Reviews
+can reveal files and submit decisions. Local processes and containers on the
+same Docker network may still reach them. No extra router or Tailscale port
+rule is needed beyond SSH.
 
 The host must stay awake and online, with Tailscale, Docker and the container running. Stopping/restarting the container or host ends running work; saved conversations can be resumed manually. Windows-host SSH instructions and VM/cloud deployment are not covered yet.
 
@@ -238,7 +289,7 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/*.sh`: container lifecycle orchestration only. Individual image suites can also be run with `bash tests/smoke.sh` or `PI_BOX_PROFILE=base bash tests/smoke.sh`.
 
-The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage`), image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
+The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage` and Plannotator commands), image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
 For Podman, select it explicitly and use an image built with that engine:
 
@@ -250,10 +301,14 @@ PI_BOX_IMAGE=pi-box:0.2.0 \
 bash tests/smoke.sh
 ```
 
-Adjust the executable and connection for your installation. For Docker outside PATH, set `DOCKER_BIN` to its full path. It uses uniquely named network-disabled containers/volumes and synthetic data, not live volumes or model credentials. Successful runs clean up owned resources; failures retain resources for inspection. Do not use global prune.
+Adjust the executable and connection for your installation. For Docker outside PATH, set `DOCKER_BIN` to its full path. It uses uniquely named containers/volumes and synthetic data, not live volumes or
+model credentials. Storage/registration checks are network-disabled. A separate
+disposable recommended container uses networking with an ephemeral host-loopback
+port to verify the real Plannotator UI and plan API through Docker publishing.
+The laptop-to-host SSH tunnel itself requires manual verification on your devices. Successful runs clean up owned resources; failures retain resources for inspection. Do not use global prune.
 
 ## Release status
 
-Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0 (2026-10-13).** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0 and pi-usage 0.10.13. The current tests cover eight focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and `/usage` registration, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. AMD64, Linux-host and Windows-host acceptance remain pending under issue #4; CI and registry publishing are deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
+Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0.** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0, `@narumitw/pi-usage` 0.66.0 and `@plannotator/pi-extension` 0.28.19. The current tests cover 19 focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and command registration, the real Plannotator UI/API through host-loopback publishing, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. AMD64, Linux-host and Windows-host acceptance remain pending under issue #4; CI and registry publishing are deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
 sd
 License choice, dedicated secret scan and publication review are pending. No open-source reuse license has been chosen yet.

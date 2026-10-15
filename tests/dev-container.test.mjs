@@ -11,12 +11,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-for (const scenario of [
-  "normal",
-  "unsafe-git",
-  "unsafe-ssh",
-  "mounts",
-  "shared-git",
+for (const {
+  scenario,
+  profile = "recommended",
+  hostPort = "19432",
+  publish,
+  status = 0,
+  error,
+} of [
+  { scenario: "normal", publish: "127.0.0.1:19432:19432" },
+  { scenario: "base", profile: "base" },
+  { scenario: "custom-port", hostPort: "29432", publish: "127.0.0.1:29432:19432" },
+  { scenario: "no-port", hostPort: "" },
+  {
+    scenario: "invalid-port",
+    hostPort: "65536",
+    status: 1,
+    error: /PLANNOTATOR_HOST_PORT must be/,
+  },
+  { scenario: "unsafe-git", status: 1 },
+  { scenario: "unsafe-ssh", status: 1 },
+  { scenario: "mounts", status: 1 },
+  { scenario: "shared-git", status: 1 },
 ]) {
   test(`container lifecycle: ${scenario}`, () => {
     const dir = mkdtempSync(join(tmpdir(), "pi-box-lifecycle-"));
@@ -50,7 +66,10 @@ fs.appendFileSync(process.env.LOG, JSON.stringify(args) + "\\n");
 
 if (args[0] === "image") {
   console.log(JSON.stringify([
-    { Config: { Env: ["GIT_CONFIG_GLOBAL=/home/node/.config/git/config"] } },
+    { Config: { Env: [
+      "GIT_CONFIG_GLOBAL=/home/node/.config/git/config",
+      "PI_BOX_PROFILE=" + process.env.PROFILE,
+    ] } },
   ]));
 } else if (args[0] === "container" && args[1] === "ls") {
   console.log("pi-box-dev");
@@ -105,12 +124,14 @@ if (args[0] === "image") {
             PATH: `${dir}:${process.env.PATH}`,
             LOG: log,
             SCENARIO: scenario,
+            PROFILE: profile,
             TEST_HOME: home,
             IMAGE: "pi-box:0.2.0",
             CONTAINER: "pi-box-dev",
             WORKSPACE_VOLUME: "pi-box-workspace",
             AGENT_VOLUME: "pi-box-agent",
             GIT_VOLUME: "pi-box-git",
+            PLANNOTATOR_HOST_PORT: hostPort,
           },
         },
       );
@@ -118,20 +139,24 @@ if (args[0] === "image") {
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line));
-      const success = scenario === "normal";
-      assert.equal(result.status, success ? 0 : 1, result.stderr);
+      assert.equal(result.status, status, result.stderr);
       for (const action of ["stop", "rm", "run"]) {
         assert.equal(
           calls.some((args) => args[0] === action),
-          success,
+          status === 0,
         );
       }
-      if (success) {
-        assert.ok(
-          calls
-            .find((args) => args[0] === "run")
-            .includes("pi-box-git:/home/node/.config/git"),
+      if (status === 0) {
+        const run = calls.find((args) => args[0] === "run");
+        assert.ok(run.includes("pi-box-git:/home/node/.config/git"));
+        const publishIndex = run.indexOf("--publish");
+        assert.equal(
+          publishIndex === -1 ? undefined : run[publishIndex + 1],
+          publish,
         );
+      }
+      if (error) {
+        assert.match(result.stderr, error);
       }
       assert.ok(
         !calls.some((args) => args[0] === "volume" && args[1] === "rm"),

@@ -14,12 +14,13 @@ IMAGE="${PI_BOX_IMAGE:-$DEFAULT_IMAGE}"
 EXPECTED_PI_VERSION="$(node -p 'require("./container/package.json").dependencies["@earendil-works/pi-coding-agent"]')"
 EXPECTED_DEPENDENCIES_JSON="$(node -p 'JSON.stringify(require("./container/package.json").dependencies)')"
 name="pi-box-smoke-$(date +%s)-$$"
+web="$name-web"
 workspace="$name-workspace"
 agent="$name-agent"
 git_volume="$name-git"
 label="io.pi-box.smoke=$name"
 passed=false
-trap 'if [ "$passed" != true ]; then printf "FAILED: inspect retained resources %s, %s, %s, %s\n" "$name" "$workspace" "$agent" "$git_volume" >&2; fi' EXIT
+trap 'if [ "$passed" != true ]; then printf "FAILED: inspect retained resources %s, %s, %s, %s, %s\n" "$name" "$web" "$workspace" "$agent" "$git_volume" >&2; fi' EXIT
 
 "${P[@]}" info >/dev/null
 if [[ $ENGINE == podman ]]; then
@@ -74,6 +75,22 @@ for transition in restart replacement; do
     "${P[@]}" exec -i -e STORAGE_TRANSITION="$transition" "$name" node --input-type=module \
         < tests/fixtures/check-persistence.mjs
 done
+
+if [[ $PROFILE == recommended ]]; then
+    # Separate container: no live mounts or credentials. Only this HTTP probe
+    # needs a network; the storage/registration checks above stay network-disabled.
+    "${P[@]}" run -d --name "$web" --label "$label" \
+        --cap-drop=ALL --security-opt=no-new-privileges \
+        --publish 127.0.0.1::19432 \
+        -e PLANNOTATOR_DATA_DIR=/tmp/plannotator-test \
+        "$IMAGE" >/dev/null
+    "${P[@]}" cp tests/fixtures/serve-plannotator.mjs "$web:/tmp/serve-plannotator.mjs"
+    "${P[@]}" exec -d "$web" node /tmp/serve-plannotator.mjs
+    address="$("${P[@]}" port "$web" 19432/tcp)"
+    [[ $address == 127.0.0.1:* ]]
+    node tests/fixtures/check-plannotator-http.mjs "$address"
+    "${P[@]}" rm --force "$web" >/dev/null
+fi
 
 "${P[@]}" rm --force "$name" >/dev/null
 "${P[@]}" volume rm "$workspace" "$agent" "$git_volume" >/dev/null

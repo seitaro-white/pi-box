@@ -26,7 +26,11 @@ test(
 
     // The image must not seed policy files before upstream extensions initialize.
     const agentDir = process.env.PI_CODING_AGENT_DIR;
-    for (const file of ["extensions/subagent/config.json", "web-search.json"]) {
+    for (const file of [
+      "extensions/subagent/config.json",
+      "web-search.json",
+      "plannotator.json",
+    ]) {
       assert.equal(existsSync(`${agentDir}/${file}`), false, file);
     }
     for (const name of extensions) {
@@ -66,6 +70,10 @@ test(
     for (const [packageName, names] of [
       ["pi-subagents", ["subagent", "bg_wait"]],
       ["pi-web-access", ["fetch_content", "get_search_content"]],
+      [
+        "@plannotator/pi-extension",
+        ["plannotator_submit_plan", "plannotator_mark_done"],
+      ],
     ]) {
       for (const name of names) {
         assert.equal(tools.has(name), bundled.has(packageName), `tool ${name}`);
@@ -74,8 +82,10 @@ test(
     const loaded = loader.getExtensions().extensions;
     for (const name of bundled) {
       assert(
-        loaded.some((extension) =>
-          extension.resolvedPath.startsWith(`/opt/pi/node_modules/${name}/`),
+        loaded.some(
+          (extension) =>
+            extension.resolvedPath === `/opt/pi/node_modules/${name}` ||
+            extension.resolvedPath.startsWith(`/opt/pi/node_modules/${name}/`),
         ),
         `extension from ${name}`,
       );
@@ -84,6 +94,26 @@ test(
       loaded.some((extension) => extension.commands.has("usage")),
       bundled.has("@narumitw/pi-usage"),
       "/usage command",
+    );
+    for (const command of [
+      "plannotator-plan-mode",
+      "plannotator-review",
+      "plannotator-annotate",
+      "plannotator-last",
+    ]) {
+      assert.equal(
+        loaded.some((extension) => extension.commands.has(command)),
+        bundled.has("@plannotator/pi-extension"),
+        `/${command} command`,
+      );
+    }
+    assert.equal(
+      process.env.PLANNOTATOR_REMOTE,
+      profile === "recommended" ? "1" : undefined,
+    );
+    assert.equal(
+      process.env.PLANNOTATOR_PORT,
+      profile === "recommended" ? "19432" : undefined,
     );
     assert.deepEqual(errors, []);
     // Tools/providers are never invoked; only loading, binding and shutdown run.

@@ -2,37 +2,27 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { createEngine, runCommand } from "./helpers/engine.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-
-/**
- * @typedef {object} SmokeOptions
- * @property {NodeJS.ProcessEnv} [env] Profile, image and engine configuration.
- * @property {import("./helpers/engine.mjs").Engine} [engine] Injectable runner for host-only tests.
- * @property {(ms: number) => Promise<void>} [sleep] Injectable readiness delay.
- * @property {(address: string) => void} [checkHttp] Host-side HTTP assertion.
- */
 
 /**
  * Smoke-test one prebuilt image using only uniquely named, disposable resources.
  * Successful runs clean up; failures and interruptions retain resources for inspection.
  * All assertions use synthetic state, without model calls or operator credentials.
  *
- * @param {SmokeOptions} [options] Configuration and host-test seams.
  * @returns {Promise<void>} Resolves only after every assertion and cleanup succeeds.
  */
-export async function runSmoke(options = {}) {
-  const env = options.env ?? process.env;
+async function runSmoke() {
+  const env = process.env;
   const profile = env.PI_BOX_PROFILE || "recommended";
   if (profile !== "base" && profile !== "recommended") {
     throw new Error("PI_BOX_PROFILE must be base or recommended");
   }
   const image =
     env.PI_BOX_IMAGE || `pi-box:0.2.0${profile === "base" ? "-base" : ""}`;
-  const engine = options.engine ?? createEngine(env);
-  const sleep = options.sleep ?? delay;
+  const engine = createEngine(env);
   const name = `pi-box-smoke-${randomUUID()}`;
   const web = `${name}-web`;
   const volumes = [
@@ -66,7 +56,7 @@ export async function runSmoke(options = {}) {
         engine.succeeds(["exec", name, "tmux", "has-session", "-t", "=shell"])
       )
         return;
-      await sleep(1000);
+      await delay(1000);
     }
     engine.run(["logs", name], { inherit: true });
     throw new Error("Container startup did not complete");
@@ -188,20 +178,11 @@ export async function runSmoke(options = {}) {
           `Expected one host-loopback port mapping, got ${address}`,
         );
       }
-      const checkHttp =
-        options.checkHttp ??
-        ((target) => {
-          runCommand(
-            process.execPath,
-            ["tests/fixtures/check-plannotator-http.mjs", target],
-            {
-              cwd: root,
-              env,
-              inherit: true,
-            },
-          );
-        });
-      checkHttp(address);
+      runCommand(
+        process.execPath,
+        ["tests/fixtures/check-plannotator-http.mjs", address],
+        { cwd: root, env, inherit: true },
+      );
       engine.run(["rm", "--force", web]);
     }
 
@@ -218,15 +199,10 @@ export async function runSmoke(options = {}) {
   }
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
-  // Exit without cleaning test resources; the exit hook prints their names.
-  process.once("SIGINT", () => process.exit(130));
-  process.once("SIGTERM", () => process.exit(143));
-  runSmoke().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
-}
+// Exit without cleaning test resources; the exit hook prints their names.
+process.once("SIGINT", () => process.exit(130));
+process.once("SIGTERM", () => process.exit(143));
+runSmoke().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

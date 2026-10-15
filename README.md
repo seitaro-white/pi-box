@@ -6,6 +6,7 @@ Comes installed with:
 - [Pi](https://pi.dev), with pi-subagents, pi-web-access, pi-usage, Plannotator and pi-lsp by default (or Pi only)
 - Ruff and Biome for Python/JavaScript linting and formatting (recommended image only)
 - [tmux](https://github.com/tmux/tmux/wiki) for persistent, reconnectable sessions
+- nano terminal text editor
 - Git, ripgrep and fd
 - Python and uv
 - JavaScript tooling: Node.js and npm
@@ -307,7 +308,7 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/smoke.mjs`: typed-JSDoc container lifecycle orchestration; `tests/integration.mjs` runs host tests followed by both prebuilt-image suites. Individual image suites can also be run with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 
-The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage`, `/lsp` and Plannotator commands), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
+The smoke suite checks startup, shared tool availability (including `nano --version` in both variants), pinned package presence/absence, extension registration (including `/usage`, `/lsp` and Plannotator commands), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
 For Podman, select it explicitly and use an image built with that engine:
 

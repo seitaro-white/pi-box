@@ -134,6 +134,7 @@ async function runSmoke() {
       "PI_OFFLINE=1",
       `EXPECTED_DEPENDENCIES_JSON=${JSON.stringify(dependencies)}`,
     ]);
+    fixture("check-npm-cache.sh");
     fixture("seed-storage.mjs");
 
     for (const transition of ["restart", "replacement"]) {

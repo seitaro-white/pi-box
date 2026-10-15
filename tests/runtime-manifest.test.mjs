@@ -5,14 +5,18 @@ import { prepareRuntime, PI_PACKAGE } from "../container/prepare-runtime.mjs";
 import { root, readJson } from "./helpers/files.mjs";
 
 const source = readJson(join(root, "container/package.json"));
+const npmTools = source.piBox.npmTools;
 const extensions = Object.keys(source.dependencies).filter(
-  (name) => name !== PI_PACKAGE,
+  (name) => name !== PI_PACKAGE && !npmTools.includes(name),
 );
 
 /** Check that committed manifests, registrations and locks match generated output. */
 function assertCommittedRuntime(profile, expected) {
   assert.deepEqual(prepareRuntime(source, profile), expected);
-  const prefix = join(root, profile === "base" ? "container/base" : "container");
+  const prefix = join(
+    root,
+    profile === "base" ? "container/base" : "container",
+  );
   assert.deepEqual(
     readJson(join(prefix, "package.json")),
     expected.manifest,
@@ -29,7 +33,9 @@ function assertCommittedRuntime(profile, expected) {
     expected.manifest.dependencies,
     "regenerate lockfile",
   );
-  for (const [name, version] of Object.entries(expected.manifest.dependencies)) {
+  for (const [name, version] of Object.entries(
+    expected.manifest.dependencies,
+  )) {
     assert.equal(lock.packages[`node_modules/${name}`].version, version, name);
   }
   return lock;
@@ -40,16 +46,17 @@ describe("runtime manifests", () => {
     const lock = assertCommittedRuntime("base", {
       manifest: {
         ...source,
+        piBox: { ...source.piBox, npmTools: [] },
         dependencies: { [PI_PACKAGE]: source.dependencies[PI_PACKAGE] },
       },
       settings: { packages: [] },
     });
-    for (const name of extensions) {
+    for (const name of [...extensions, ...npmTools]) {
       assert.equal(lock.packages[`node_modules/${name}`], undefined, name);
     }
   });
 
-  it("recommended keeps all exact pins and registers every bundled extension", () => {
+  it("recommended keeps all exact pins and registers extensions but not CLI tools", () => {
     assertCommittedRuntime("recommended", {
       manifest: source,
       settings: {
@@ -66,6 +73,30 @@ describe("runtime manifests", () => {
           "recommended",
         ),
       /Use an exact version/,
+    );
+  });
+
+  it("supports manifests without CLI tools and rejects invalid tool declarations", () => {
+    const minimal = {
+      dependencies: { [PI_PACKAGE]: "1.2.0", extension: "1.0.0" },
+    };
+    assert.deepEqual(prepareRuntime(minimal, "recommended").settings, {
+      packages: ["/opt/pi/node_modules/extension"],
+    });
+    for (const invalidTools of ["extension", [PI_PACKAGE], ["missing"]]) {
+      assert.throws(
+        () =>
+          prepareRuntime(
+            { ...minimal, piBox: { npmTools: invalidTools } },
+            "recommended",
+          ),
+        /piBox.npmTools must list non-Pi runtime dependencies/,
+      );
+    }
+    assert.throws(() => prepareRuntime(minimal, "unknown"), /Profile must be/);
+    assert.throws(
+      () => prepareRuntime({ dependencies: {} }, "base"),
+      /Runtime must include Pi/,
     );
   });
 });

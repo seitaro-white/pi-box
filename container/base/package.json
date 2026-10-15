@@ -6,5 +6,8 @@
   "description": "Pi Box development runtime with Pi extensions",
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.2.0"
+  },
+  "piBox": {
+    "npmTools": []
   }
 }

@@ -3,7 +3,8 @@
 Lightweight development container built around the [Pi](https://pi.dev) agent harness. Run locally or SSH into the machine hosting it.
 
 Comes installed with:
-- [Pi](https://pi.dev), with pi-subagents, pi-web-access, pi-usage and Plannotator by default (or Pi only)
+- [Pi](https://pi.dev), with pi-subagents, pi-web-access, pi-usage, Plannotator and pi-lsp by default (or Pi only)
+- Ruff and Biome for Python/JavaScript linting and formatting (recommended image only)
 - [tmux](https://github.com/tmux/tmux/wiki) for persistent, reconnectable sessions
 - Git, ripgrep and fd
 - Python and uv
@@ -59,14 +60,14 @@ The equivalent manual commands follow.
 ### 1. Build the image
 
 ```bash
-# Default recommended bundle: Pi + subagents, web access, usage and Plannotator.
+# Default recommended bundle: Pi + extensions, Ruff and Biome.
 docker build -t pi-box:0.2.0 .
 
 # Alternatively: Pi without bundled third-party extensions.
 docker build --target base -t pi-box:0.2.0-base .
 ```
 
-`recommended` is the default target; `--target recommended` also selects it explicitly. Both variants include the same development tools. Builds store images locally; nothing is published to a registry. Exact Pi/extension versions are declared in [`container/package.json`](container/package.json).
+`recommended` is the default target; `--target recommended` also selects it explicitly. Both variants include the shared development tools listed above, but only recommended includes bundled extensions, Ruff and Biome. Builds store images locally; nothing is published to a registry. Exact Pi/extension/Biome versions are declared in [`container/package.json`](container/package.json); Ruff's version is pinned in the recommended Dockerfile stage.
 
 ### 2. Start the container
 
@@ -244,11 +245,28 @@ Only `/workspace`, `/home/node/.pi/agent`, and `/home/node/.config/git` persist 
 
 **Persistent volumes are not backups.** You are responsible for recovery. Volume exports can contain credentials and private conversations; never commit or publicly upload them. Deleting/resetting the container engine's VM can destroy its volumes.
 
+## Code quality tools (recommended image)
+
+The recommended image bundles [`@narumitw/pi-lsp`](https://github.com/narumiruna/pi-extensions/tree/main/packages/pi-lsp), Ruff (installed with uv) and Biome (installed with npm). They are image-owned, available on `PATH`, and remain available when an existing agent volume is mounted. The base image includes none of these three additions.
+
+Inside Pi, `/lsp` shows server availability. The agent can request `lsp_diagnostics` for Python or JavaScript and `lsp_fix` for supported source actions. Ruff handles Python lint diagnostics; Biome handles JavaScript/TypeScript diagnostics. No Python type checker is bundled. Other default server routes may be listed as unavailable; they are not automatically installed.
+
+This extension does **not** automatically format edits or run checks after each write. Ask the agent to format and lint changed files before finishing, or add that instruction to the project's `AGENTS.md`. The CLI commands are also available directly:
+
+```bash
+ruff format path/to/file.py
+ruff check path/to/file.py
+biome check --write path/to/file.mjs  # Formatting and safe lint fixes
+biome check path/to/file.mjs
+```
+
+No LSP policy config is seeded: upstream defaults work with the installed tools, and existing operator settings are preserved. To select servers explicitly, configure `.pi/pi-lsp.json` in a trusted project or `~/.pi/agent/pi-lsp.json`; a custom server map replaces the defaults. Formatting/lint rules belong in each project's Ruff/Biome configuration. LSP feedback does not replace the project's authoritative checks and tests.
+
 ## Updating Pi and extensions
 
-Run `make versions` to compare the pinned Pi, extension and override versions with npm's `latest` dist-tags (requires Node.js, npm and registry access). This is read-only; lookup failures produce a nonzero exit status. A different version is not necessarily newer or compatible.
+Run `make versions` to compare the pinned Pi, extension, npm tool and override versions with npm's `latest` dist-tags (requires Node.js, npm and registry access). This is read-only; lookup failures produce a nonzero exit status. A different version is not necessarily newer or compatible.
 
-Edit the exact versions in **`container/package.json`**. Pi is the base dependency; every other direct dependency is treated as a bundled Pi package. To add or remove an extension, add or remove its dependency there. Keep exact versions, not `latest`, `^` or `~` ranges.
+Edit the exact npm versions in **`container/package.json`**. Pi is the base dependency; other direct dependencies are bundled Pi packages unless listed in `piBox.npmTools`. Those CLI tools are installed only in recommended and are not registered as Pi packages. To add or remove an extension, add or remove its dependency there. Keep exact versions, not `latest`, `^` or `~` ranges. Update Ruff's pinned `RUFF_VERSION` in the recommended Dockerfile stage separately.
 
 Regenerate the derived base manifest, package registrations and both lockfiles:
 
@@ -289,7 +307,7 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/smoke.mjs`: typed-JSDoc container lifecycle orchestration; `tests/integration.mjs` runs host tests followed by both prebuilt-image suites. Individual image suites can also be run with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 
-The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage` and Plannotator commands), image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
+The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage`, `/lsp` and Plannotator commands), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
 For Podman, select it explicitly and use an image built with that engine:
 
@@ -309,6 +327,6 @@ The laptop-to-host SSH tunnel itself requires manual verification on your device
 
 ## Release status
 
-Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0.** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0, `@narumitw/pi-usage` 0.66.0 and `@plannotator/pi-extension` 0.28.19. The current tests cover 22 focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and command registration, the real Plannotator UI/API through host-loopback publishing, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. GitHub Actions builds and smoke-tests both variants on native Linux AMD64 and ARM64 runners. Windows-host acceptance remains pending under issue #4; registry publishing is deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
+Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0.** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0, `@narumitw/pi-usage` 0.66.0, `@plannotator/pi-extension` 0.28.19, `@narumitw/pi-lsp` 0.49.9, Ruff 0.17.0 and Biome 2.5.15. The current tests cover 23 focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and command registration, real Ruff/Biome LSP diagnostics and CLI formatting, the real Plannotator UI/API through host-loopback publishing, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. GitHub Actions builds and smoke-tests both variants on native Linux AMD64 and ARM64 runners. Windows-host acceptance remains pending under issue #4; registry publishing is deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
 sd
 License choice, dedicated secret scan and publication review are pending. No open-source reuse license has been chosen yet.

@@ -5,12 +5,18 @@ import { describe, it } from "node:test";
 import { root, readJson } from "./helpers/files.mjs";
 import { agentState } from "./helpers/agent-state.mjs";
 
-const defaults = readJson(join(root, "container/defaults/settings.json")).packages;
-const operatorPackage = { source: "npm:operator-package@1.0.0", extensions: [] };
+const defaults = readJson(
+  join(root, "container/defaults/settings.json"),
+).packages;
+const operatorPackage = {
+  source: "npm:operator-package@1.0.0",
+  extensions: [],
+};
 const policyFiles = [
   "web-search.json",
   "extensions/subagent/config.json",
   "plannotator.json",
+  "pi-lsp.json",
 ];
 
 /** Seed personal settings, policy and synthetic secrets that startup must retain. */
@@ -82,7 +88,11 @@ describe("agent initialization", () => {
     ]);
     files.forEach((file, index) => {
       assert.equal(state.read(file), before[index].content, file);
-      assert.equal(statSync(state.path(file)).mtimeMs, before[index].mtime, file);
+      assert.equal(
+        statSync(state.path(file)).mtimeMs,
+        before[index].mtime,
+        file,
+      );
     });
   });
 
@@ -154,9 +164,9 @@ describe("agent initialization", () => {
 
       assert.throws(() => state.run(), error);
 
-      files.forEach((name, index) =>
-        assert.equal(state.read(name), before[index], name),
-      );
+      files.forEach((name, index) => {
+        assert.equal(state.read(name), before[index], name);
+      });
     }
   });
 });

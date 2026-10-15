@@ -55,15 +55,21 @@ ENV PI_BOX_PROFILE=base
 USER node
 WORKDIR /workspace
 
-# Last target is the default: Pi plus all extensions in container/package.json.
+# Last target is the default: Pi, bundled extensions and their CLI tools.
 FROM common AS recommended
 USER root
 WORKDIR /opt/pi
+# Image-owned installation, not hidden by an existing agent-volume mount.
+ARG RUFF_VERSION=0.17.0
+RUN UV_TOOL_DIR=/opt/ruff UV_TOOL_BIN_DIR=/usr/local/bin \
+    UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_DOWNLOADS=never \
+    uv tool install --no-cache --python /usr/local/bin/python3 "ruff==${RUFF_VERSION}"
 COPY container/package.json container/package-lock.json ./
 RUN node prepare-runtime.mjs recommended \
     && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
     && npm cache clean --force \
-    && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi
+    && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
+    && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
 # Bind inside the container for Docker forwarding; publish only on host loopback.
 # Remote mode prints the review URL instead of opening a container browser.
 ENV PI_BOX_PROFILE=recommended \

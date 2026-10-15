@@ -3,7 +3,7 @@ FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27
 
 # Development tools (Debian packages are not snapshot-pinned).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates fd-find git ripgrep tmux \
+    && apt-get install -y --no-install-recommends bash ca-certificates fd-find git nano ripgrep tmux \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd
 

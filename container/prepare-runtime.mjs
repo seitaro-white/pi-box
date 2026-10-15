@@ -1,5 +1,5 @@
-// package.json is authoritative. All direct dependencies except Pi are bundled
-// Pi packages. Derive the base manifest and registrations; never resolve versions.
+// package.json is authoritative. Direct dependencies except Pi and piBox.npmTools
+// are bundled Pi packages. Derive manifests and registrations; never resolve versions.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -27,15 +27,29 @@ export function prepareRuntime(manifest, profile) {
     }
   }
 
+  const npmTools = manifest.piBox?.npmTools ?? [];
+  if (
+    !Array.isArray(npmTools) ||
+    npmTools.some((name) => name === PI_PACKAGE || !manifest.dependencies[name])
+  ) {
+    throw new Error("piBox.npmTools must list non-Pi runtime dependencies");
+  }
+
   const dependencies =
     profile === "base"
       ? { [PI_PACKAGE]: manifest.dependencies[PI_PACKAGE] }
       : manifest.dependencies;
   return {
-    manifest: { ...manifest, dependencies },
+    manifest: {
+      ...manifest,
+      ...(profile === "base" && manifest.piBox
+        ? { piBox: { ...manifest.piBox, npmTools: [] } }
+        : {}),
+      dependencies,
+    },
     settings: {
       packages: Object.keys(dependencies)
-        .filter((name) => name !== PI_PACKAGE)
+        .filter((name) => name !== PI_PACKAGE && !npmTools.includes(name))
         .map((name) => `/opt/pi/node_modules/${name}`),
     },
   };

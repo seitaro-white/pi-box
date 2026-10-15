@@ -285,9 +285,9 @@ npm run test:integration
 
 Test organization:
 - `tests/*.test.mjs`: named `node:test` suites; each stateful test has its own temporary directory and automatic cleanup.
-- `tests/fixtures/`: container assertions and synthetic state, kept separate from shell scripts.
+- `tests/fixtures/`: container assertions and synthetic state, kept separate from host orchestration.
 - `tests/helpers/`: shared setup, cleanup and engine selection.
-- `tests/*.sh`: container lifecycle orchestration only. Individual image suites can also be run with `bash tests/smoke.sh` or `PI_BOX_PROFILE=base bash tests/smoke.sh`.
+- `tests/smoke.mjs`: typed-JSDoc container lifecycle orchestration; `tests/integration.mjs` runs host tests followed by both prebuilt-image suites. Individual image suites can also be run with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 
 The smoke suite checks startup, pinned package presence/absence, extension registration (including `/usage` and Plannotator commands), image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
@@ -298,7 +298,7 @@ PI_BOX_ENGINE=podman \
 PODMAN_BIN=/opt/podman/bin/podman \
 PODMAN_CONNECTION=podman-machine-default \
 PI_BOX_IMAGE=pi-box:0.2.0 \
-bash tests/smoke.sh
+node tests/smoke.mjs
 ```
 
 Adjust the executable and connection for your installation. For Docker outside PATH, set `DOCKER_BIN` to its full path. It uses uniquely named containers/volumes and synthetic data, not live volumes or
@@ -309,6 +309,6 @@ The laptop-to-host SSH tunnel itself requires manual verification on your device
 
 ## Release status
 
-Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0.** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0, `@narumitw/pi-usage` 0.66.0 and `@plannotator/pi-extension` 0.28.19. The current tests cover 19 focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and command registration, the real Plannotator UI/API through host-loopback publishing, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. AMD64, Linux-host and Windows-host acceptance remain pending under issue #4; CI and registry publishing are deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
+Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0.** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0, `@narumitw/pi-usage` 0.66.0 and `@plannotator/pi-extension` 0.28.19. The current tests cover 22 focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and command registration, the real Plannotator UI/API through host-loopback publishing, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. GitHub Actions builds and smoke-tests both variants on native Linux AMD64 and ARM64 runners. Windows-host acceptance remains pending under issue #4; registry publishing is deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
 sd
 License choice, dedicated secret scan and publication review are pending. No open-source reuse license has been chosen yet.

@@ -71,7 +71,7 @@ jobs:
           cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-base,mode=max
 
       - name: Smoke-test base image
-        run: PI_BOX_PROFILE=base PI_BOX_IMAGE=pi-box:ci-base bash tests/smoke.sh
+        run: PI_BOX_PROFILE=base PI_BOX_IMAGE=pi-box:ci-base node tests/smoke.mjs
 
       - name: Build recommended image
         uses: docker/build-push-action@v7
@@ -86,4 +86,4 @@ jobs:
           cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-recommended,mode=max
 
       - name: Smoke-test recommended image
-        run: PI_BOX_PROFILE=recommended PI_BOX_IMAGE=pi-box:ci-recommended bash tests/smoke.sh
+        run: PI_BOX_PROFILE=recommended PI_BOX_IMAGE=pi-box:ci-recommended node tests/smoke.mjs

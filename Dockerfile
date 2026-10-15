@@ -40,6 +40,7 @@ WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/pi-box-entrypoint"]
 CMD ["tmux", "-D"]
 
+# Root's build-time npm cache must not touch the runtime user's home directory.
 # The base lockfile describes only Pi. Derive its manifest from the same source
 # used by recommended; npm ci fails if the derived manifest and lock disagree.
 FROM common AS base
@@ -48,8 +49,8 @@ WORKDIR /opt/pi
 COPY container/package.json ./
 COPY container/base/package-lock.json ./package-lock.json
 RUN node prepare-runtime.mjs base \
-    && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && npm cache clean --force \
+    && npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
+    && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi
 ENV PI_BOX_PROFILE=base
 USER node
@@ -66,8 +67,8 @@ RUN UV_TOOL_DIR=/opt/ruff UV_TOOL_BIN_DIR=/usr/local/bin \
     uv tool install --no-cache --python /usr/local/bin/python3 "ruff==${RUFF_VERSION}"
 COPY container/package.json container/package-lock.json ./
 RUN node prepare-runtime.mjs recommended \
-    && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && npm cache clean --force \
+    && npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
+    && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
 # Bind inside the container for Docker forwarding; publish only on host loopback.

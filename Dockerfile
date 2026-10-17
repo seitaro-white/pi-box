@@ -3,9 +3,10 @@ FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27
 
 # Development tools (Debian packages are not snapshot-pinned).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates fd-find git nano ripgrep tmux \
+    && apt-get install -y --no-install-recommends bash bat ca-certificates fd-find git micro nano nnn ripgrep tmux \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -s /usr/bin/fdfind /usr/local/bin/fd
+    && ln -s /usr/bin/fdfind /usr/local/bin/fd \
+    && ln -s /usr/bin/batcat /usr/local/bin/bat
 
 # uv and a baseline Python interpreter.
 COPY --from=ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 /uv /uvx /usr/local/bin/

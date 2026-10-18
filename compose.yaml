@@ -1,0 +1,32 @@
+name: pi-box
+
+services:
+  pi:
+    image: ${IMAGE:-pi-box:0.2.0}
+    build:
+      context: .
+      target: ${TARGET:-recommended}
+    container_name: ${CONTAINER:-pi-box-dev}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - workspace:/workspace
+      - agent:/home/node/.pi/agent
+      - git:/home/node/.config/git
+    healthcheck:
+      test: ["CMD", "tmux", "has-session", "-t", "=shell"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
+
+# Explicit names reuse the existing storage rather than project-prefixed volumes.
+volumes:
+  workspace:
+    name: ${WORKSPACE_VOLUME:-pi-box-workspace}
+  agent:
+    name: ${AGENT_VOLUME:-pi-box-agent}
+  git:
+    name: ${GIT_VOLUME:-pi-box-git}

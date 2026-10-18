@@ -87,3 +87,6 @@ jobs:
 
       - name: Smoke-test recommended image
         run: PI_BOX_PROFILE=recommended PI_BOX_IMAGE=pi-box:ci-recommended node tests/smoke.mjs
+
+      - name: Verify Compose lifecycle and migration
+        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/compose.mjs

@@ -1,15 +1,16 @@
-.PHONY: build runtime check replace attach up versions
+.PHONY: build runtime check replace migrate attach up versions
 
 IMAGE ?= pi-box:0.2.0
+TARGET ?= recommended
 CONTAINER ?= pi-box-dev
 WORKSPACE_VOLUME ?= pi-box-workspace
 AGENT_VOLUME ?= pi-box-agent
 GIT_VOLUME ?= pi-box-git
-export IMAGE CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME
+export IMAGE TARGET CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME
 
-# Refresh derived runtime files before Docker copies them into the image.
+# Refresh derived runtime files before Compose builds the image.
 build: runtime
-	docker build -t "$(IMAGE)" .
+	docker compose build pi
 
 runtime:
 	node container/prepare-runtime.mjs recommended
@@ -21,15 +22,21 @@ versions:
 	node scripts/check-versions.mjs
 
 check:
-	node scripts/dev-container.mjs check
+	node scripts/check-container.mjs check
 
-replace:
-	node scripts/dev-container.mjs replace
+# Preflight must precede every Compose command that could discard a container.
+replace: check
+	docker compose up -d --no-build --pull never --force-recreate --wait --wait-timeout 60 pi
+
+# One-time, explicitly requested handover of an old docker-run container.
+migrate: build
+	node scripts/check-container.mjs migrate
+	docker compose up -d --no-build --pull never --wait --wait-timeout 60 pi
 
 attach:
-	node scripts/dev-container.mjs attach
+	docker compose exec pi tmux attach-session -t '=shell'
 
-# Recursive calls keep these steps sequential, even with make -j.
-up:
-	$(MAKE) build
-	$(MAKE) replace
+# Build first, then preflight; this stays sequential even with make -j.
+up: build
+	$(MAKE) check
+	docker compose up -d --no-build --pull never --wait --wait-timeout 60 pi

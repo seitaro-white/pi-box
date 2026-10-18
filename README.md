@@ -16,103 +16,111 @@ This is my personal remote development setup for coding, which I thought I'd sha
 
 ## Quickstart — install and run locally
 
-Make sure Docker is installed and running. Start from your **host terminal**, in this repository. These commands assume a fresh setup; inspect any existing `pi-box-dev` container or `pi-box-*` volumes before reusing them.
+Install Docker with **Docker Compose v2.24+**, Node.js 18+ (including npm), and
+Make. Docker Desktop includes Compose. Run commands from your **host terminal**
+in this repository, with Docker running.
 
 ### Everyday commands
 
-From the host terminal in this repository (requires Node.js 18+ and Make on
-the host, in addition to Docker):
-
 ```bash
-make up       # Build, check, and replace the container; retain named volumes
-make attach   # Attach separately when ready
+make up       # Build, preflight, then let Compose start/update Pi Box
+make attach   # Attach to the ready tmux shell
 ```
 
-Individual steps are available as `make build`, `make check` (read-only), and
-`make replace`. Replacement ends running sessions. It verifies the existing
-volume mounts and refuses to discard the normal container user's non-persistent
-Git files or SSH keys. It does not inspect root's home directory.
-Git settings and HTTPS credentials live directly in a third volume
-at `/home/node/.config/git`; there is no per-replacement backup/restore.
-This is a focused check, not a complete backup: files outside the three mounted
-directories will be lost. A stopped existing container must be started before
-the check can run.
+Inside tmux, run `pi` from `/workspace` or your project directory.
+**Detach with Ctrl+B, then D.** Use `make attach` to reconnect; if Pi is already
+running, don't start a second instance. For VS Code, use **Dev Containers:
+Attach to Running Container…**.
 
-Replacement requires all three documented volume mounts. There is no migration
-or reset mode; containers with different mounts must be handled manually.
+Compose starts one service, `pi`, using [`compose.yaml`](compose.yaml). No
+database or other companion service is included, and no container ports are
+published. `make up` waits for the tmux shell to be healthy and does not launch
+Pi automatically. An unchanged `up` keeps existing sessions; a changed image or
+configuration can recreate the container and end them.
 
-Override defaults if needed, for example:
-`make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent GIT_VOLUME=my-git`.
-Extra or bind mounts require manual replacement. Do not run lifecycle commands
-concurrently. Attachment remains separate; `make up` does not launch Pi.
-
-Neither image publishes container ports by default.
-
-The Makefile calls `scripts/dev-container.mjs`, a Node.js ES-module script.
-It uses Docker's JSON inspection output for checks and passes the small
-`scripts/check-disposable-files.sh` file to the container's shell for file checks.
-The manual Docker commands below do not require Node.js on the host.
-
-The equivalent manual commands follow.
-
-### 1. Build the image
+Other useful commands:
 
 ```bash
-# Default recommended bundle: Pi + extensions, Ruff and Biome.
-docker build -t pi-box:0.2.0 .
-
-# Alternatively: Pi without bundled third-party extensions.
-docker build --target base -t pi-box:0.2.0-base .
+make build                  # Build only; don't touch the container
+make check                  # Read-only preflight; requires the built image
+make replace                # Preflight, then force recreation using the built image
+docker compose logs pi      # View logs
+docker compose exec pi bash # Open a separate shell (not tmux)
 ```
 
-`recommended` is the default target; `--target recommended` also selects it explicitly. Both variants include the shared development tools listed above, but only recommended includes bundled extensions, Ruff and Biome. Builds store images locally; nothing is published to a registry. Exact Pi/extension/Biome versions are declared in [`container/package.json`](container/package.json); Ruff's version is pinned in the recommended Dockerfile stage.
+The Makefile is a thin wrapper: Compose owns builds, networking, startup,
+recreation and health waiting. `scripts/check-container.mjs` adds only the
+storage checks and explicit legacy handover. **Use Make for startup/replacement:**
+direct `docker compose up` bypasses those checks. Don't run lifecycle commands
+concurrently.
 
-### 2. Start the container
+### Storage and replacement safeguards
+
+Three explicitly named volumes keep the same names and mount paths as before:
+
+| Volume | Container path | Contents |
+| --- | --- | --- |
+| `pi-box-workspace` | `/workspace` | Projects |
+| `pi-box-agent` | `/home/node/.pi/agent` | Pi settings, login and conversations |
+| `pi-box-git` | `/home/node/.config/git` | Git settings and HTTPS credentials |
+
+Compose creates missing volumes and reuses existing ones. The image runs as
+`node`, drops all Linux capabilities and enables `no-new-privileges`. Volumes
+with incompatible ownership need manual repair.
+
+Before any potentially destructive `up` or `replace`, preflight verifies the
+three writable named mounts, refuses non-persistent Git files/SSH keys under
+`/home/node`, and rejects volumes used by other running containers. This is
+**not a complete backup or filesystem scan**: other files outside the mounts
+can be lost, and root's home is not inspected. Extra/bind mounts, differently
+named existing services and foreign Compose projects require manual handling.
+
+A stopped existing container must be started before its files can be inspected:
+use `docker compose start --wait pi` for a Compose container, or
+`docker start pi-box-dev` for the old standalone container. This does not replace it.
+
+**Never use `docker compose down -v` on storage you want to keep.** It deletes
+Compose-managed volumes. Ordinary `down` retains volumes but ends sessions.
+
+### One-time migration from the previous Docker-run setup
+
+Inspect and back up your existing storage first, finish running jobs, then run:
 
 ```bash
-docker run -d --name pi-box-dev \
-  -v pi-box-workspace:/workspace \
-  -v pi-box-agent:/home/node/.pi/agent \
-  -v pi-box-git:/home/node/.config/git \
-  --cap-drop=ALL --security-opt=no-new-privileges \
-  pi-box:0.2.0
+make migrate
+make attach
 ```
 
-For the base variant, use `pi-box:0.2.0-base` instead of `pi-box:0.2.0`.
+Migration builds the image, checks the existing `pi-box-dev` and all three
+mounts, then stops/removes **only that container** and starts the Compose
+replacement using the same volumes. Running sessions end. If its mounts differ
+or non-persistent Git files/SSH keys exist, migration refuses; preserve those
+files and resolve the layout manually first. No data is copied or reset.
+`make up` deliberately refuses implicit takeover of a standalone container.
 
-Docker creates the named volumes if they don't exist. `/workspace` stores your projects; `/home/node/.pi/agent` stores Pi settings, login and conversation history; `/home/node/.config/git` stores global Git settings and saved HTTPS credentials. `--cap-drop` and `--security-opt` restrict privileges. The image prepares these directories for the non-root user; an existing volume with incompatible ownership requires manual repair.
+### Image variants and overrides
 
-### 3. Open a container shell, attach to tmux, and start Pi
-
-On your host:
+`recommended` is the default: Pi, bundled extensions, Ruff and Biome. For Pi
+without bundled extensions or those linters:
 
 ```bash
-docker exec -it pi-box-dev bash
+make up TARGET=base IMAGE=pi-box:0.2.0-base
 ```
 
-Inside the container:
+Both variants retain the shared development tools. Exact npm versions live in
+[`container/package.json`](container/package.json); Ruff is pinned in the
+Dockerfile. Builds stay local; nothing is published to a registry.
+
+You can override `IMAGE`, `TARGET`, `CONTAINER`, `WORKSPACE_VOLUME`,
+`AGENT_VOLUME`, `GIT_VOLUME` and `COMPOSE_PROJECT_NAME`. For example:
 
 ```bash
-tmux attach-session -t '=shell'
+make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent GIT_VOLUME=my-git
 ```
 
-Once attached to the tmux session:
-
-```bash
-cd /workspace
-pi
-```
-
-
-**Detach with Ctrl+B, then D.** The tmux session and Pi keep running while the container and host remain running. If you entered through Bash, type `exit` afterward to leave that extra shell.
-
-To reconnect directly from the host:
-
-```bash
-docker exec -it pi-box-dev tmux attach-session -t '=shell'
-```
-
-This returns to the existing session—if Pi is already running there, don't start another instance. For VS Code, use **Dev Containers: Attach to Running Container…**.
+Use the **same overrides for every command**, including `attach`, `check` and
+`migrate`. Set a distinct project/container and three distinct volumes for an
+independent second instance; don't share writable volumes between instances.
 
 ## Git setup and private repositories
 
@@ -180,10 +188,11 @@ From your laptop:
 ssh YOUR_HOST_USERNAME@YOUR_HOST_TAILSCALE_ADDRESS
 ```
 
-Then, in the host's SSH shell, attach as usual:
+Then, in the host's SSH shell, change into this repository and attach:
 
 ```bash
-docker exec -it pi-box-dev tmux attach-session -t '=shell'
+cd /path/to/pi-box
+make attach
 ```
 
 Start `pi` in the attached shell if it is not already running. No SSH port
@@ -250,7 +259,9 @@ After building both variants, explicitly opt into the full integration suite:
 npm run test:integration
 ```
 
-This runs the host tests and both image smoke suites. For different image tags:
+This runs the host tests, both image smoke suites and Docker Compose acceptance.
+It uses prebuilt images and isolated disposable storage, not your running setup.
+For different image tags:
 
 ```bash
 PI_BOX_BASE_IMAGE=pi-box:my-base \
@@ -262,7 +273,9 @@ Test organization:
 - `tests/*.test.mjs`: named `node:test` suites; each stateful test has its own temporary directory and automatic cleanup.
 - `tests/fixtures/`: container assertions and synthetic state, kept separate from host orchestration.
 - `tests/helpers/`: shared setup, cleanup and engine selection.
-- `tests/smoke.mjs`: typed-JSDoc container lifecycle orchestration; `tests/integration.mjs` runs host tests followed by both prebuilt-image suites. Individual image suites can also be run with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
+- `tests/smoke.mjs`: image acceptance, runnable separately with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
+- `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and standalone-container migration using existing volumes, including unlabelled legacy volumes. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
+- `tests/integration.mjs`: host tests, both image suites, then Compose acceptance (Docker only).
 
 The smoke suite checks startup, shared tool availability (including version checks for nano, micro, nnn, bat, ripgrep and fd in both variants), pinned package presence/absence, extension registration (including `/usage` and `/lsp`), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
@@ -284,6 +297,13 @@ use global prune.
 
 ## Release status
 
-Local release candidate. **Both base and recommended targets built and smoke-tested on Apple Silicon macOS with Docker Desktop, using Pi 1.2.0.** The recommended bundle pins pi-subagents 0.78.0, pi-web-access 0.40.0, `@narumitw/pi-usage` 0.66.0, `@narumitw/pi-lsp` 0.49.9, Ruff 0.17.0 and Biome 2.5.15. The tests cover focused host cases (including variant reconciliation), image startup, pinned package presence/absence, extension tools and command registration, real Ruff/Biome LSP diagnostics and CLI formatting, user/permissions and restart/replacement persistence. Terminal and interactive-session checks are deferred. No model calls, provider-usage requests or credentialed login were tested. Earlier prototype acceptance used ARM64 macOS/Podman; these new variants have not been tested on Podman. GitHub Actions builds and smoke-tests both variants on native Linux AMD64 and ARM64 runners. Windows-host acceptance remains pending under issue #4; registry publishing is deferred. Debian packages are not snapshot-pinned, so rebuilds are not bit-for-bit reproducible.
-sd
+Local release candidate. Both image variants and the Compose lifecycle/migration
+suite have been verified on Apple Silicon macOS with Docker Desktop and Pi 1.3.0.
+See the runtime manifest for current pins. CI is configured to build and test
+both variants plus Compose acceptance on native Linux AMD64 and ARM64 runners.
+Interactive terminal/SSH checks, Windows-host acceptance and registry publishing
+remain deferred. No model calls, provider-usage requests or credentialed login
+were tested. Podman's image smoke runner remains available, but the supported
+lifecycle now requires Docker Compose. Debian packages are not snapshot-pinned,
+so rebuilds are not bit-for-bit reproducible.
 License choice, dedicated secret scan and publication review are pending. No open-source reuse license has been chosen yet.

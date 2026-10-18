@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { runCommand } from "./helpers/engine.mjs";
 
 /**
- * Run host tests, then both smoke suites against prebuilt images, stopping on failure.
+ * Run host tests, both smoke suites and Docker Compose acceptance against prebuilt images.
  * No image build, dependency installation or operator-container replacement occurs here.
  *
  * @returns {void}
@@ -21,6 +21,9 @@ function runIntegration() {
       ...options,
       env: { ...env, PI_BOX_PROFILE: profile, PI_BOX_IMAGE: image },
     });
+  }
+  if (!env.PI_BOX_ENGINE || env.PI_BOX_ENGINE === "docker") {
+    runCommand(process.execPath, ["tests/compose.mjs"], options);
   }
 }
 

@@ -11,6 +11,7 @@ Comes installed with:
 - Git, ripgrep (`rg`) and fd
 - Python and uv
 - JavaScript tooling: Node.js and npm
+- PostgreSQL 15 client (`psql`); the server is an optional separate container
 
 This is my personal remote development setup for coding, which I thought I'd share with the world and develop publicly. I primarily SSH into it, but it works as a local development environment too if you're into that.
 
@@ -32,9 +33,8 @@ Inside tmux, run `pi` from `/workspace` or your project directory.
 running, don't start a second instance. For VS Code, use **Dev Containers:
 Attach to Running Container…**.
 
-Compose starts one service, `pi`, using [`compose.yaml`](compose.yaml). No
-database or other companion service is included, and no container ports are
-published. `make up` waits for the tmux shell to be healthy and does not launch
+By default, Compose starts only `pi`, using [`compose.yaml`](compose.yaml).
+PostgreSQL is opt-in (see below). Neither setup publishes database ports. `make up` waits for the tmux shell to be healthy and does not launch
 Pi automatically. An unchanged `up` keeps existing sessions; a changed image or
 configuration can recreate the container and end them.
 
@@ -121,6 +121,81 @@ make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent 
 Use the **same overrides for every command**, including `attach`, `check` and
 `migrate`. Set a distinct project/container and three distinct volumes for an
 independent second instance; don't share writable volumes between instances.
+
+## Optional PostgreSQL — development only
+
+From the host repository:
+
+```bash
+make db-init                  # Once: generate private .env.postgres credentials
+make up DATABASE=1            # Start Pi Box and PostgreSQL; wait for readiness
+make attach DATABASE=1
+```
+
+If you still have the previous standalone Pi container, use
+`make migrate DATABASE=1` instead of the first `up`. As usual, migration or a
+changed configuration ends running sessions; finish active work first.
+
+`DATABASE=1` selects [`compose.postgres.yaml`](compose.postgres.yaml) alongside
+the normal Compose file. Plain `make up` remains Pi-only. Both Pi image variants
+include Debian's PostgreSQL 15 client; the server image is a digest-pinned,
+multi-architecture PostgreSQL 15 image. There is no extra package repository.
+The server image is pulled automatically if missing.
+
+Inside Pi Box, Pi or your application can use:
+
+```bash
+psql -c 'SELECT current_user, current_database();'
+```
+
+The connection is **`db:5432`, database `appdb`, role `app`**. Standard libpq
+variables (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`) are set in
+Pi's environment; libraries that use a connection URL must be configured by
+your application without committing its password. `localhost` inside Pi is
+not the database container. No host/SSH port forwarding is needed.
+
+The `app` role owns `appdb` and can create tables, run migrations and read/write
+its data. It is **not a superuser** and cannot create roles or databases.
+Pi receives only the app password, not the administrator password. First startup
+creates this role and ownership only—no demo tables or sample data.
+
+### Credentials and persistence
+
+`make db-init` creates `.env.postgres` with random, separate app/admin passwords
+and mode `0600`. It refuses to overwrite an existing file. The file is Git-ignored
+and excluded from image builds. Keep it private and keep using it: changing the
+file does **not** change passwords in an already-initialized database. Password
+rotation is manual. Credentials are supplied as container environment variables,
+so Docker administrators and `docker compose config` can reveal them.
+
+PostgreSQL stores data in its own project-scoped volume, normally
+**`pi-box_postgres`**, mounted at `/var/lib/postgresql/data`. It survives container
+recreation. Bootstrap runs only when this storage is empty. `make replace
+DATABASE=1` replaces **Pi only**, leaving the database container alone; use
+`make up DATABASE=1` to start both services. Volumes are not backups. Never use
+`down -v` on data you need, share writable database storage between containers,
+or change the server's major version without a PostgreSQL data migration.
+
+To stop the database without deleting its data:
+
+```bash
+make db-stop DATABASE=1
+```
+
+To return Pi to its normal environment, then run `make up` without `DATABASE=1`.
+Omitting the option alone does not automatically stop an already-running database.
+Use `DATABASE=1` consistently for database-enabled Make commands. A different
+`DATABASE_ENV_FILE` can select a private credentials file for another instance;
+use a different `COMPOSE_PROJECT_NAME` (and Pi container/volume overrides) too.
+
+For direct Compose inspection, select the same files explicitly:
+
+```bash
+COMPOSE_FILE=compose.yaml:compose.postgres.yaml COMPOSE_ENV_FILES=.env.postgres docker compose logs db
+```
+
+This is a minimal local development service—not a production database setup or
+an automatic backup, upgrade or password-management system.
 
 ## Git setup and private repositories
 
@@ -259,8 +334,9 @@ After building both variants, explicitly opt into the full integration suite:
 npm run test:integration
 ```
 
-This runs the host tests, both image smoke suites and Docker Compose acceptance.
-It uses prebuilt images and isolated disposable storage, not your running setup.
+This runs host tests, both image smoke suites, Compose acceptance and the focused
+PostgreSQL integration test. It uses prebuilt Pi images, pulls the pinned database
+image if needed, and uses disposable storage/credentials—not your running setup.
 For different image tags:
 
 ```bash
@@ -275,7 +351,8 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/smoke.mjs`: image acceptance, runnable separately with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 - `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and standalone-container migration using existing volumes, including unlabelled legacy volumes. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
-- `tests/integration.mjs`: host tests, both image suites, then Compose acceptance (Docker only).
+- `tests/postgres.mjs`: authenticated SQL/CRUD from Pi, restricted role, no published DB port, and data persistence after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres.mjs`.
+- `tests/integration.mjs`: host tests, both image suites, then Compose and PostgreSQL acceptance (Docker only).
 
 The smoke suite checks startup, shared tool availability (including version checks for nano, micro, nnn, bat, ripgrep and fd in both variants), pinned package presence/absence, extension registration (including `/usage` and `/lsp`), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 
@@ -298,9 +375,10 @@ use global prune.
 ## Release status
 
 Local release candidate. Both image variants and the Compose lifecycle/migration
-suite have been verified on Apple Silicon macOS with Docker Desktop and Pi 1.3.0.
+suite, plus optional PostgreSQL SQL/persistence, have been verified on Apple
+Silicon macOS with Docker Desktop and Pi 1.3.0.
 See the runtime manifest for current pins. CI is configured to build and test
-both variants plus Compose acceptance on native Linux AMD64 and ARM64 runners.
+both variants plus Compose/PostgreSQL acceptance on native Linux AMD64 and ARM64 runners.
 Interactive terminal/SSH checks, Windows-host acceptance and registry publishing
 remain deferred. No model calls, provider-usage requests or credentialed login
 were tested. Podman's image smoke runner remains available, but the supported

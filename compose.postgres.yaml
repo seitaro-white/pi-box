@@ -1,0 +1,39 @@
+# Opt in with make up DATABASE=1. No server, DB volume or credentials in Pi-only mode.
+services:
+  pi:
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: appdb
+      PGUSER: app
+      PGPASSWORD: ${APP_DB_PASSWORD:?Run make db-init first, then use DATABASE=1}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    # PostgreSQL 15 matches Debian Bookworm's client; pin the multi-arch image.
+    image: docker.io/library/postgres:15-bookworm@sha256:d4a8e1f88f475ee3e0137fa89d21ebc59f6c6ab16bf369ee92907607cc3455ae
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: appdb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make db-init first, then use DATABASE=1}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run make db-init first, then use DATABASE=1}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./container/postgres-init.sh:/docker-entrypoint-initdb.d/10-app.sh:ro
+    healthcheck:
+      # TCP avoids the temporary socket-only init server; authenticate as the app
+      # so a stale/mismatched password fails readiness instead of looking healthy.
+      test: ["CMD-SHELL", "PGPASSWORD=\"$${APP_DB_PASSWORD}\" psql -h 127.0.0.1 -U app -d appdb -tAc 'SELECT 1' >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+# Compose scopes this volume by project (default: pi-box_postgres).
+volumes:
+  postgres: {}

@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { runCommand } from "./helpers/engine.mjs";
 
 /**
- * Run host tests, both smoke suites and Docker Compose acceptance against prebuilt images.
+ * Run host/image/Compose/PostgreSQL acceptance against prebuilt Pi images.
+ * The optional, digest-pinned PostgreSQL server image is pulled if needed.
  * No image build, dependency installation or operator-container replacement occurs here.
  *
  * @returns {void}
@@ -24,6 +25,7 @@ function runIntegration() {
   }
   if (!env.PI_BOX_ENGINE || env.PI_BOX_ENGINE === "docker") {
     runCommand(process.execPath, ["tests/compose.mjs"], options);
+    runCommand(process.execPath, ["tests/postgres.mjs"], options);
   }
 }
 

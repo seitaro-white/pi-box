@@ -169,7 +169,9 @@ test("Make checks before Compose up/replace and uses Compose for attachment", ()
           `node scripts/check-container.mjs ${target === "migrate" ? "migrate" : "check"}`,
       );
       assert.ok(check >= 0 && check < up, result.stdout);
-      assert.match(lines[up], /--no-build --pull never/);
+      assert.match(lines[up], /--no-build --pull (never|missing)/);
+      if (target === "replace")
+        assert.match(lines[up], /--no-deps --force-recreate/);
     }
   }
 });

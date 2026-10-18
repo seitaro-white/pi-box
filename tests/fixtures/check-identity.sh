@@ -5,13 +5,16 @@ set -eu
 test "$PI_BOX_PROFILE" = "$EXPECTED_PROFILE"
 test "$(id -u)" = 1000
 test "$(pi --version)" = "$EXPECTED_PI_VERSION"
-for tool in git nano micro nnn bat rg fd uv python tmux; do command -v "$tool" >/dev/null; done
+for tool in git nano micro nnn bat rg fd uv python tmux psql; do command -v "$tool" >/dev/null; done
 nano --version >/dev/null
 micro --version >/dev/null
 nnn -V >/dev/null
 bat --version >/dev/null
 rg --version >/dev/null
 fd --version >/dev/null
+psql --version | grep -E '^psql \(PostgreSQL\) 15\.' >/dev/null
+# The client is present in both variants, never the PostgreSQL server.
+! command -v postgres >/dev/null
 test ! -w /opt/pi
 test "$(stat -c %a /home/node/.pi/agent)" = 700
 test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600

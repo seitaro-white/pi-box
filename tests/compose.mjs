@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const name = `pi-box-compose-${randomUUID()}`;
 const env = {
   ...process.env,
-  ENABLE_POSTGRES: "0",
+  COMPOSE_DISABLE_ENV_FILE: "1",
   COMPOSE_FILE: fileURLToPath(new URL("../compose.yaml", import.meta.url)),
   COMPOSE_PROJECT_NAME: name,
   CONTAINER: name,
@@ -20,6 +20,8 @@ const env = {
   AGENT_VOLUME: `${name}-agent`,
   GIT_VOLUME: `${name}-git`,
 };
+// Do not load the operator's local environment files during acceptance.
+delete env.COMPOSE_ENV_FILES;
 const options = { cwd: root, env, timeout: 120_000 };
 const docker = (args, extra = {}) =>
   runCommand("docker", args, { ...options, ...extra });

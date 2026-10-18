@@ -34,8 +34,9 @@ running, don't start a second instance. For VS Code, use **Dev Containers:
 Attach to Running Container…**.
 
 By default, Compose starts only `pi`, using [`compose.yaml`](compose.yaml).
-PostgreSQL is opt-in (see below). Neither setup publishes database ports. `make up` waits for the tmux shell to be healthy and does not launch
-Pi automatically. An unchanged `up` keeps existing sessions; a changed image or
+PostgreSQL is opt-in through your local `.env` (see below). Neither setup
+publishes database ports. `make up` starts all selected services, waits for
+readiness and does not launch Pi automatically. An unchanged `up` keeps existing sessions; a changed image or
 configuration can recreate the container and end them.
 
 Other useful commands:
@@ -81,6 +82,37 @@ use `docker compose start --wait pi`. This does not replace it.
 **Never use `docker compose down -v` on storage you want to keep.** It deletes
 Compose-managed volumes. Ordinary `down` retains volumes but ends sessions.
 
+### Choose your services once — local `.env`
+
+Compose reads `.env` automatically for both Make and direct Compose commands.
+Without this file, the default is Pi Box only. To configure a local setup:
+
+```bash
+cp -n .env.example .env  # Don't overwrite an existing private configuration
+```
+
+Edit `COMPOSE_FILE` in `.env` to select the files that make up your environment:
+
+```dotenv
+# Pi Box only:
+COMPOSE_FILE=compose.yaml
+```
+
+Or, for Pi Box with PostgreSQL:
+
+```dotenv
+COMPOSE_FILE=compose.yaml:compose.postgres.yaml
+```
+
+Then use plain `make up` and `make attach`—no service-enable flags to remember.
+The PostgreSQL selection also needs credentials; generate them as described below.
+Future optional capabilities can have their own Compose files appended to this
+list instead of adding Make conditionals. There is no Langfuse service yet.
+
+`.env` is private, Git-ignored and excluded from image builds. It can hold both
+configuration and credentials. Shell environment variables or explicit command
+line overrides take precedence over this file.
+
 ### Image variants and overrides
 
 `recommended` is the default: Pi, bundled extensions, Ruff and Biome. For Pi
@@ -101,26 +133,30 @@ You can override `IMAGE`, `TARGET`, `CONTAINER`, `WORKSPACE_VOLUME`,
 make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent GIT_VOLUME=my-git
 ```
 
-Use the **same project/container/volume overrides for every command**, including
-`attach` and `check`. Set a distinct project/container and three distinct volumes for an
-independent second instance; don't share writable volumes between instances.
+For a persistent choice, put these settings in `.env` rather than repeating
+command-line overrides. For example, use `TARGET=base` and
+`IMAGE=pi-box:0.2.0-base` there for the base image. The same settings then apply
+to `up`, `attach`, checks and direct Compose commands. Use a distinct
+project/container and three distinct volumes for an independent second instance;
+don't share writable volumes between instances.
 
 ## Optional PostgreSQL — development only
 
-From the host repository:
+Set `COMPOSE_FILE=compose.yaml:compose.postgres.yaml` in your local `.env`, then
+run from the host repository:
 
 ```bash
-make generate-db-credentials  # Once: generate private .env.postgres credentials
-make up ENABLE_POSTGRES=1     # Start Pi Box and PostgreSQL; wait for readiness
-make attach                  # Attach to the existing container; no flag needed
+make generate-db-credentials  # Once: append private passwords to .env
+make up                      # Start the services selected in .env
+make attach
 ```
 
 A changed image or configuration may replace Pi Box and end running sessions;
 finish active work first.
 
-`ENABLE_POSTGRES=1` selects [`compose.postgres.yaml`](compose.postgres.yaml) alongside
-the normal Compose file. Plain `make up` remains Pi-only. Both Pi image variants
-include Debian's PostgreSQL 15 client; the server image is a digest-pinned,
+[`compose.postgres.yaml`](compose.postgres.yaml) adds PostgreSQL and Pi's
+connection settings to the base configuration. Both Pi image variants include
+Debian's PostgreSQL 15 client; the server image is a digest-pinned,
 multi-architecture PostgreSQL 15 image. There is no extra package repository.
 The server image is pulled automatically if missing.
 
@@ -146,41 +182,45 @@ on first startup to create this role and ownership only—no demo tables or samp
 
 `make generate-db-credentials` runs
 [`generate-db-credentials.mjs`](scripts/generate-db-credentials.mjs) on the host.
-It only creates `.env.postgres` with random, separate app/admin passwords
-and file permissions `0600`. It refuses to overwrite an existing file. The file is Git-ignored
-and excluded from image builds. Keep it private and keep using it: changing the
-file does **not** change passwords in an already-initialized database. Password
-rotation is manual. Credentials are supplied as container environment variables,
-so Docker administrators and `docker compose config` can reveal them.
+It appends random, separate app/admin passwords to `.env`, preserving existing
+Compose settings and restricting file permissions to `0600`. It creates the file
+if missing and refuses to replace existing password entries. It does not start
+containers or change your service selection.
+
+Keep `.env` private and keep using the same passwords: editing the file does
+**not** rotate passwords in an initialized database. If you have an older
+`.env.postgres`, reuse its existing password entries in `.env` rather than
+generating replacements. Credentials are supplied as container environment
+variables, so Docker administrators and `docker compose config` can reveal them.
 
 PostgreSQL stores data in its own project-scoped volume, normally
 **`pi-box_postgres`**, mounted at `/var/lib/postgresql/data`. It survives container
 recreation. Bootstrap runs only when this storage is empty.
-`make replace ENABLE_POSTGRES=1` replaces **Pi only**, leaving the database
-container alone; use `make up ENABLE_POSTGRES=1` to start both services. Volumes are not backups. Never use
+`make replace` replaces **Pi only**, leaving the database container alone;
+`make up` starts all services selected in `.env`. Volumes are not backups. Never use
 `down -v` on data you need, share writable database storage between containers,
 or change the server's major version without a PostgreSQL data migration.
 
 To stop the database without deleting its data:
 
 ```bash
-make stop-postgres ENABLE_POSTGRES=1
+docker compose stop db
 ```
 
-To return Pi to its normal environment, then run `make up` without `ENABLE_POSTGRES=1`.
-Omitting the option alone does not automatically stop an already-running database.
-Use `ENABLE_POSTGRES=1` for database-enabled `up`, `replace` and `stop-postgres`.
-It is not needed for `attach`, `build` or credential generation. Make does not
-remember the previous choice; `export ENABLE_POSTGRES=1` sets a default for Make
-commands in your current terminal. A different
-`POSTGRES_CREDENTIALS_FILE` can select a private credentials file for another instance;
-use a different `COMPOSE_PROJECT_NAME` (and Pi container/volume overrides) too.
+Run that while the PostgreSQL overlay is still selected. To return Pi to its
+normal environment, then change `.env` to `COMPOSE_FILE=compose.yaml` and run
+`make up`. Removing a file from the selection does not automatically stop a
+previously running service or delete its data. The passwords may remain in
+`.env`; Pi-only mode does not pass them into Pi.
 
-For direct Compose inspection, select the same files explicitly:
+Direct Compose commands use the same local selection automatically:
 
 ```bash
-COMPOSE_FILE=compose.yaml:compose.postgres.yaml COMPOSE_ENV_FILES=.env.postgres docker compose logs db
+docker compose logs db
 ```
+
+For an independent instance, use a different Compose project name and Pi
+container/volume settings, with its own private `.env` and passwords.
 
 This is a minimal local development service—not a production database setup or
 an automatic backup, upgrade or password-management system.
@@ -340,7 +380,7 @@ Test organization:
 - `tests/smoke.mjs`: image acceptance, runnable separately with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 - `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and persistent storage across full teardown/recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
 - `tests/postgres-configuration.test.mjs`: credential generation and optional PostgreSQL configuration.
-- `tests/postgres-integration.mjs`: authenticated SQL/CRUD from Pi, restricted role, no published DB port, and data persistence after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
+- `tests/postgres-integration.mjs`: automatic `.env` file selection/overrides, PostgreSQL on/off selection, authenticated SQL/CRUD from Pi, restricted role, no published DB port, and persistent data after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
 - `tests/integration.mjs`: host tests, both image suites, then Compose and PostgreSQL acceptance (Docker only).
 
 The smoke suite checks startup, shared tool availability (including version checks for nano, micro, nnn, bat, ripgrep and fd in both variants), pinned package presence/absence, extension registration (including `/usage` and `/lsp`), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.

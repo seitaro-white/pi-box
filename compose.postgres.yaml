@@ -1,4 +1,5 @@
-# Opt in with make up ENABLE_POSTGRES=1. No server, DB volume or credentials in Pi-only mode.
+# Select with COMPOSE_FILE=compose.yaml:compose.postgres.yaml in your local .env.
+# No server, DB volume or credentials are added by the base compose.yaml alone.
 services:
   pi:
     environment:
@@ -6,7 +7,7 @@ services:
       PGPORT: "5432"
       PGDATABASE: appdb
       PGUSER: app
-      PGPASSWORD: ${APP_DB_PASSWORD:?Run make generate-db-credentials first, then use ENABLE_POSTGRES=1}
+      PGPASSWORD: ${APP_DB_PASSWORD:?Run make generate-db-credentials to add credentials to .env}
     depends_on:
       db:
         condition: service_healthy
@@ -19,8 +20,8 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: appdb
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make generate-db-credentials first, then use ENABLE_POSTGRES=1}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run make generate-db-credentials first, then use ENABLE_POSTGRES=1}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make generate-db-credentials to add credentials to .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run make generate-db-credentials to add credentials to .env}
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     volumes:
       - postgres:/var/lib/postgresql/data

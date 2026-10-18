@@ -3,29 +3,38 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCommand } from "./helpers/engine.mjs";
 
 const testProjectName = `pi-box-postgres-${randomUUID()}`;
-const temporaryCredentialsDirectory = mkdtempSync(
-  join(tmpdir(), testProjectName),
-);
-const testEnvironment = {
-  ...process.env,
-  COMPOSE_FILE: ["../compose.yaml", "../compose.postgres.yaml"]
-    .map((composeFilePath) =>
-      fileURLToPath(new URL(composeFilePath, import.meta.url)),
-    )
-    .join(":"),
-  COMPOSE_ENV_FILES: join(temporaryCredentialsDirectory, ".env.postgres"),
-  POSTGRES_CREDENTIALS_FILE: join(
-    temporaryCredentialsDirectory,
-    ".env.postgres",
-  ),
-  ENABLE_POSTGRES: "1",
+const repositoryDirectory = fileURLToPath(new URL("../", import.meta.url));
+const temporaryProjectDirectory = mkdtempSync(join(tmpdir(), testProjectName));
+// Copy only the runtime configuration/scripts, never the operator's .env or data.
+for (const resourcePath of [
+  "Makefile",
+  "compose.yaml",
+  "compose.postgres.yaml",
+  "scripts",
+  "container/bootstrap-app-role.sh",
+]) {
+  const destinationPath = join(temporaryProjectDirectory, resourcePath);
+  mkdirSync(dirname(destinationPath), { recursive: true });
+  cpSync(join(repositoryDirectory, resourcePath), destinationPath, {
+    recursive: true,
+  });
+}
+const localComposeSettings = {
+  COMPOSE_FILE: "compose.yaml:compose.postgres.yaml",
   COMPOSE_PROJECT_NAME: testProjectName,
   CONTAINER: testProjectName,
   IMAGE: process.env.PI_BOX_RECOMMENDED_IMAGE || "pi-box:0.2.0",
@@ -34,11 +43,26 @@ const testEnvironment = {
   AGENT_VOLUME: `${testProjectName}-agent`,
   GIT_VOLUME: `${testProjectName}-git`,
 };
-for (const credentialVariable of ["POSTGRES_PASSWORD", "APP_DB_PASSWORD"]) {
-  delete testEnvironment[credentialVariable];
-}
+writeFileSync(
+  join(temporaryProjectDirectory, ".env"),
+  Object.entries(localComposeSettings)
+    .map(([settingName, settingValue]) => `${settingName}=${settingValue}\n`)
+    .join(""),
+  { mode: 0o600 },
+);
+const testEnvironment = { ...process.env };
+for (const settingName of [
+  ...Object.keys(localComposeSettings),
+  "POSTGRES_PASSWORD",
+  "APP_DB_PASSWORD",
+  "COMPOSE_ENV_FILES",
+  "COMPOSE_DISABLE_ENV_FILE",
+  "COMPOSE_PROFILES",
+  "COMPOSE_PATH_SEPARATOR",
+])
+  delete testEnvironment[settingName];
 const commandOptions = {
-  cwd: fileURLToPath(new URL("../", import.meta.url)),
+  cwd: temporaryProjectDirectory,
   env: testEnvironment,
   timeout: 300_000,
 };
@@ -70,6 +94,11 @@ try {
   runMakeTarget("generate-db-credentials");
   const resolvedComposeConfiguration = JSON.parse(
     runComposeCommand(["config", "--format", "json"]),
+  );
+  assert.equal(resolvedComposeConfiguration.name, testProjectName);
+  assert.equal(
+    resolvedComposeConfiguration.services.pi.image,
+    localComposeSettings.IMAGE,
   );
   assert.equal(resolvedComposeConfiguration.services.db.ports, undefined);
   assert.equal(
@@ -165,22 +194,52 @@ try {
     "database recreation retains data without replaying bootstrap",
   );
 
+  // Selecting Pi-only in .env stops passing credentials to Pi but retains the
+  // database volume. Re-selecting the overlay reconnects to the same data.
+  const environmentFilePath = join(temporaryProjectDirectory, ".env");
+  const databaseEnabledConfiguration = readFileSync(
+    environmentFilePath,
+    "utf8",
+  );
+  runComposeCommand(["stop", "db"]);
+  writeFileSync(
+    environmentFilePath,
+    databaseEnabledConfiguration.replace(
+      "COMPOSE_FILE=compose.yaml:compose.postgres.yaml",
+      "COMPOSE_FILE=compose.yaml",
+    ),
+  );
+  runMakeTarget("up");
+  const piOnlyConfiguration = JSON.parse(
+    runComposeCommand(["config", "--format", "json"]),
+  );
+  assert.deepEqual(Object.keys(piOnlyConfiguration.services), ["pi"]);
+  assert.equal(
+    inspectContainer(testProjectName).Config.Env.some((value) =>
+      value.startsWith("PGPASSWORD="),
+    ),
+    false,
+  );
+  writeFileSync(environmentFilePath, databaseEnabledConfiguration);
+  runMakeTarget("up");
+  assert.equal(executeSqlInPiContainer("SELECT body FROM notes"), "updated");
+
   runComposeCommand(["down"]);
   runDockerCommand([
     "volume",
     "rm",
-    testEnvironment.WORKSPACE_VOLUME,
-    testEnvironment.AGENT_VOLUME,
-    testEnvironment.GIT_VOLUME,
+    localComposeSettings.WORKSPACE_VOLUME,
+    localComposeSettings.AGENT_VOLUME,
+    localComposeSettings.GIT_VOLUME,
     resolvedComposeConfiguration.volumes.postgres.name,
   ]);
-  rmSync(temporaryCredentialsDirectory, { recursive: true, force: true });
+  rmSync(temporaryProjectDirectory, { recursive: true, force: true });
   console.log(
-    "PASS: PostgreSQL SQL/CRUD from Pi, restricted role, password authentication, no published ports and persistence across recreation.",
+    "PASS: native .env Compose selection/overrides, PostgreSQL SQL/CRUD, restricted role, private networking and persistence across recreation.",
   );
 } catch (error) {
   console.error(
-    `FAILED: retained isolated project ${testProjectName} and credential directory ${temporaryCredentialsDirectory}.`,
+    `FAILED: retained isolated project ${testProjectName} and private test directory ${temporaryProjectDirectory}.`,
   );
   throw error; // Never print credential-bearing Compose config or environment files.
 }

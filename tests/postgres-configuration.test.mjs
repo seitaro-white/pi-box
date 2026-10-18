@@ -11,7 +11,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
+const credentialsGeneratorPath = fileURLToPath(
+  new URL("../scripts/generate-db-credentials.mjs", import.meta.url),
+);
 function createTemporaryTestDirectory(testContext) {
   const temporaryDirectory = mkdtempSync(
     join(tmpdir(), "pi-box-postgres-configuration-"),
@@ -21,28 +25,29 @@ function createTemporaryTestDirectory(testContext) {
   );
   return temporaryDirectory;
 }
+function runCredentialsGenerator(temporaryDirectory) {
+  return spawnSync(process.execPath, [credentialsGeneratorPath], {
+    cwd: temporaryDirectory,
+    encoding: "utf8",
+  });
+}
 
-test("database credentials are private, random, separate and never printed or overwritten", (testContext) => {
+test("credential generation preserves local Compose settings, creates private passwords and refuses rotation", (testContext) => {
   const temporaryDirectory = createTemporaryTestDirectory(testContext);
-  const credentialsFilePath = join(temporaryDirectory, ".env.postgres");
-  const runCredentialsGenerator = () =>
-    spawnSync(process.execPath, ["scripts/generate-db-credentials.mjs"], {
-      encoding: "utf8",
-      env: { ...process.env, POSTGRES_CREDENTIALS_FILE: credentialsFilePath },
-    });
-  const generationResult = runCredentialsGenerator();
+  const credentialsFilePath = join(temporaryDirectory, ".env");
+  const existingSettings =
+    "# Keep this selection\nCOMPOSE_FILE=compose.yaml:compose.postgres.yaml";
+  writeFileSync(credentialsFilePath, existingSettings, { mode: 0o644 });
+  const generationResult = runCredentialsGenerator(temporaryDirectory);
   assert.equal(generationResult.status, 0, generationResult.stderr);
   const credentialsFileContents = readFileSync(credentialsFilePath, "utf8");
-  assert.match(
-    credentialsFileContents,
-    /^POSTGRES_PASSWORD=[a-f0-9]{64}\nAPP_DB_PASSWORD=[a-f0-9]{64}\n$/,
+  assert.ok(credentialsFileContents.startsWith(`${existingSettings}\n`));
+  const credentialMatch = credentialsFileContents.match(
+    /POSTGRES_PASSWORD=([a-f0-9]{64})\nAPP_DB_PASSWORD=([a-f0-9]{64})\n$/,
   );
-  const generatedPasswords = credentialsFileContents
-    .trim()
-    .split("\n")
-    .map((environmentEntry) => environmentEntry.split("=")[1]);
-  assert.notEqual(generatedPasswords[0], generatedPasswords[1]);
-  for (const generatedPassword of generatedPasswords) {
+  assert.ok(credentialMatch);
+  assert.notEqual(credentialMatch[1], credentialMatch[2]);
+  for (const generatedPassword of credentialMatch.slice(1)) {
     assert.ok(
       !(generationResult.stdout + generationResult.stderr).includes(
         generatedPassword,
@@ -50,28 +55,47 @@ test("database credentials are private, random, separate and never printed or ov
     );
   }
   assert.equal(statSync(credentialsFilePath).mode & 0o777, 0o600);
-  const repeatGenerationResult = runCredentialsGenerator();
+  const repeatGenerationResult = runCredentialsGenerator(temporaryDirectory);
   assert.equal(repeatGenerationResult.status, 1);
   assert.match(repeatGenerationResult.stderr, /left unchanged/);
   assert.equal(
     readFileSync(credentialsFilePath, "utf8"),
     credentialsFileContents,
   );
+});
+
+test("credentials can be generated before local configuration and existing entries are never overwritten", (testContext) => {
+  const temporaryDirectory = createTemporaryTestDirectory(testContext);
+  const credentialsFilePath = join(temporaryDirectory, ".env");
+  assert.equal(runCredentialsGenerator(temporaryDirectory).status, 0);
+  assert.match(
+    readFileSync(credentialsFilePath, "utf8"),
+    /^POSTGRES_PASSWORD=[a-f0-9]{64}\nAPP_DB_PASSWORD=[a-f0-9]{64}\n$/,
+  );
+  writeFileSync(
+    credentialsFilePath,
+    "export APP_DB_PASSWORD=SYNTHETIC_EXISTING\n",
+  );
+  assert.equal(runCredentialsGenerator(temporaryDirectory).status, 1);
+  assert.equal(
+    readFileSync(credentialsFilePath, "utf8"),
+    "export APP_DB_PASSWORD=SYNTHETIC_EXISTING\n",
+  );
   rmSync(credentialsFilePath);
   const symlinkTargetPath = join(temporaryDirectory, "symlink-target");
   writeFileSync(symlinkTargetPath, "SYNTHETIC");
   symlinkSync(symlinkTargetPath, credentialsFilePath);
-  assert.equal(runCredentialsGenerator().status, 1);
+  assert.equal(runCredentialsGenerator(temporaryDirectory).status, 1);
   assert.equal(readFileSync(symlinkTargetPath, "utf8"), "SYNTHETIC");
 });
 
-for (const postgresEnabled of ["0", "1"]) {
-  test(`Make selects PostgreSQL only with ENABLE_POSTGRES=${postgresEnabled}`, (testContext) => {
+for (const explicitOverrides of [false, true]) {
+  test(`Make delegates file selection to Compose (explicit overrides: ${explicitOverrides})`, (testContext) => {
     const temporaryDirectory = createTemporaryTestDirectory(testContext);
     writeFileSync(
       join(temporaryDirectory, "docker"),
       `#!${process.execPath}
-console.log(JSON.stringify({ composeFiles: process.env.COMPOSE_FILE || "", composeEnvironmentFiles: process.env.COMPOSE_ENV_FILES || "" }));
+console.log(JSON.stringify({ composeFiles: process.env.COMPOSE_FILE || null, image: process.env.IMAGE || null }));
 `,
       { mode: 0o755 },
     );
@@ -80,32 +104,36 @@ console.log(JSON.stringify({ composeFiles: process.env.COMPOSE_FILE || "", compo
       PATH: `${temporaryDirectory}:${process.env.PATH}`,
     };
     delete stubEnvironment.COMPOSE_FILE;
-    delete stubEnvironment.COMPOSE_ENV_FILES;
-    const commandResult = spawnSync(
-      "make",
-      [
-        "-s",
-        "attach",
-        `ENABLE_POSTGRES=${postgresEnabled}`,
-        "POSTGRES_CREDENTIALS_FILE=.env.test-postgres",
-      ],
-      { encoding: "utf8", env: stubEnvironment },
-    );
+    delete stubEnvironment.IMAGE;
+    const makeArguments = [
+      "-s",
+      "attach",
+      ...(explicitOverrides
+        ? [
+            "COMPOSE_FILE=compose.yaml:compose.postgres.yaml",
+            "IMAGE=pi-box:test-override",
+          ]
+        : []),
+    ];
+    const commandResult = spawnSync("make", makeArguments, {
+      encoding: "utf8",
+      env: stubEnvironment,
+    });
     assert.equal(commandResult.status, 0, commandResult.stderr);
     assert.deepEqual(
       JSON.parse(commandResult.stdout),
-      postgresEnabled === "1"
+      explicitOverrides
         ? {
             composeFiles: "compose.yaml:compose.postgres.yaml",
-            composeEnvironmentFiles: ".env.test-postgres",
+            image: "pi-box:test-override",
           }
-        : { composeFiles: "compose.yaml", composeEnvironmentFiles: "" },
+        : { composeFiles: null, image: null },
     );
   });
 }
 
-test("the default credential file is ignored by Git and excluded from image context", () => {
-  const gitIgnoreResult = spawnSync("git", ["check-ignore", ".env.postgres"], {
+test("local configuration is Git-ignored and excluded from image context", () => {
+  const gitIgnoreResult = spawnSync("git", ["check-ignore", ".env"], {
     encoding: "utf8",
   });
   assert.equal(gitIgnoreResult.status, 0, gitIgnoreResult.stderr);

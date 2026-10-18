@@ -1,8 +1,8 @@
-// Focused MVP acceptance: SQL from Pi Box, least-privilege role, private
+// Focused MVP acceptance: SQL from Pi Box with one PostgreSQL login, private
 // networking and persistence. Only disposable credentials/containers/volumes.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   cpSync,
   mkdirSync,
@@ -25,7 +25,6 @@ for (const resourcePath of [
   "compose.yaml",
   "compose.postgres.yaml",
   "scripts",
-  "container/bootstrap-app-role.sh",
 ]) {
   const destinationPath = join(temporaryProjectDirectory, resourcePath);
   mkdirSync(dirname(destinationPath), { recursive: true });
@@ -42,6 +41,7 @@ const localComposeSettings = {
   WORKSPACE_VOLUME: `${testProjectName}-workspace`,
   AGENT_VOLUME: `${testProjectName}-agent`,
   GIT_VOLUME: `${testProjectName}-git`,
+  POSTGRES_PASSWORD: randomBytes(32).toString("hex"), // Disposable test fixture only.
 };
 writeFileSync(
   join(temporaryProjectDirectory, ".env"),
@@ -53,8 +53,6 @@ writeFileSync(
 const testEnvironment = { ...process.env };
 for (const settingName of [
   ...Object.keys(localComposeSettings),
-  "POSTGRES_PASSWORD",
-  "APP_DB_PASSWORD",
   "COMPOSE_ENV_FILES",
   "COMPOSE_DISABLE_ENV_FILE",
   "COMPOSE_PROFILES",
@@ -91,7 +89,6 @@ const executeSqlInPiContainer = (sqlQuery) =>
   ]);
 
 try {
-  runMakeTarget("generate-db-credentials");
   const resolvedComposeConfiguration = JSON.parse(
     runComposeCommand(["config", "--format", "json"]),
   );
@@ -105,9 +102,10 @@ try {
     resolvedComposeConfiguration.services.pi.environment.POSTGRES_PASSWORD,
     undefined,
   );
-  assert.notEqual(
+  assert.equal(
     resolvedComposeConfiguration.services.pi.environment.PGPASSWORD,
     resolvedComposeConfiguration.services.db.environment.POSTGRES_PASSWORD,
+    "Pi and PostgreSQL use one manually configured password",
   );
   runMakeTarget("up");
   const originalPostgresContainerId = getPostgresContainerId();
@@ -121,14 +119,14 @@ try {
   );
   assert.equal(
     executeSqlInPiContainer("SELECT current_user, current_database()"),
-    "app|appdb",
+    "postgres|appdb",
   );
   assert.match(executeSqlInPiContainer("SHOW server_version"), /^15\./);
   assert.equal(
     executeSqlInPiContainer(
-      "SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls FROM pg_roles WHERE rolname = current_user",
+      "SELECT rolsuper FROM pg_roles WHERE rolname = current_user",
     ),
-    "f|f|f|f|f",
+    "t",
   );
   assert.equal(
     executeSqlInPiContainer(
@@ -191,7 +189,7 @@ try {
   assert.equal(
     executeSqlInPiContainer("SELECT body FROM notes"),
     "updated",
-    "database recreation retains data without replaying bootstrap",
+    "database recreation retains existing data",
   );
 
   // Selecting Pi-only in .env stops passing credentials to Pi but retains the
@@ -235,7 +233,7 @@ try {
   ]);
   rmSync(temporaryProjectDirectory, { recursive: true, force: true });
   console.log(
-    "PASS: native .env Compose selection/overrides, PostgreSQL SQL/CRUD, restricted role, private networking and persistence across recreation.",
+    "PASS: native .env Compose selection, single PostgreSQL login, SQL/CRUD, private networking and persistent data.",
   );
 } catch (error) {
   console.error(

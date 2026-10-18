@@ -1,4 +1,4 @@
-.PHONY: build check replace attach up versions generate-db-credentials
+.PHONY: build check replace attach up versions
 
 # Compose reads file selection, image/storage overrides and credentials from .env.
 # No local configuration is required for the default Pi-only setup.
@@ -13,9 +13,6 @@ build:
 
 versions:
 	node scripts/check-versions.mjs
-
-generate-db-credentials:
-	node scripts/generate-db-credentials.mjs
 
 check:
 	node scripts/check-container.mjs

@@ -105,7 +105,7 @@ COMPOSE_FILE=compose.yaml:compose.postgres.yaml
 ```
 
 Then use plain `make up` and `make attach`—no service-enable flags to remember.
-The PostgreSQL selection also needs credentials; generate them as described below.
+The PostgreSQL selection also needs a password in `.env`, as described below.
 Future optional capabilities can have their own Compose files appended to this
 list instead of adding Make conditionals. There is no Langfuse service yet.
 
@@ -142,11 +142,18 @@ don't share writable volumes between instances.
 
 ## Optional PostgreSQL — development only
 
-Set `COMPOSE_FILE=compose.yaml:compose.postgres.yaml` in your local `.env`, then
-run from the host repository:
+Set these values manually in your private `.env` (choose your own password):
+
+```dotenv
+COMPOSE_FILE=compose.yaml:compose.postgres.yaml
+POSTGRES_PASSWORD=<your-strong-private-password>
+```
+
+For an existing database, keep its current `POSTGRES_PASSWORD` unchanged.
+Then run from the host repository:
 
 ```bash
-make generate-db-credentials  # Once: append private passwords to .env
+chmod 600 .env
 make up                      # Start the services selected in .env
 make attach
 ```
@@ -166,36 +173,34 @@ Inside Pi Box, Pi or your application can use:
 psql -c 'SELECT current_user, current_database();'
 ```
 
-The connection is **`db:5432`, database `appdb`, role `app`**. Standard libpq
+The connection is **`db:5432`, database `appdb`, login `postgres`**. Standard libpq
 variables (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`) are set in
 Pi's environment; libraries that use a connection URL must be configured by
 your application without committing its password. `localhost` inside Pi is
 not the database container. No host/SSH port forwarding is needed.
 
-The `app` role owns `appdb` and can create tables, run migrations and read/write
-its data. It is **not a superuser** and cannot create roles or databases.
-Pi receives only the app password, not the administrator password.
-[`bootstrap-app-role.sh`](container/bootstrap-app-role.sh) runs inside PostgreSQL
-on first startup to create this role and ownership only—no demo tables or sample data.
+Pi uses the **PostgreSQL administrator account directly**, with one password.
+It can manage all databases and users on this server, not just tables in `appdb`.
+This is a convenience for trusted local development, not a restricted database
+sandbox or a production access model.
+
+`appdb` is simply the database name, not a second login or permission layer.
+The official image creates it on first startup with empty storage. There are no
+custom role-provisioning scripts, demo tables or sample data. Existing databases,
+users and their data are left intact when reusing a volume.
 
 ### Credentials and persistence
 
-`make generate-db-credentials` runs
-[`generate-db-credentials.mjs`](scripts/generate-db-credentials.mjs) on the host.
-It appends random, separate app/admin passwords to `.env`, preserving existing
-Compose settings and restricting file permissions to `0600`. It creates the file
-if missing and refuses to replace existing password entries. It does not start
-containers or change your service selection.
-
-Keep `.env` private and keep using the same passwords: editing the file does
-**not** rotate passwords in an initialized database. If you have an older
-`.env.postgres`, reuse its existing password entries in `.env` rather than
-generating replacements. Credentials are supplied as container environment
-variables, so Docker administrators and `docker compose config` can reveal them.
+Set `POSTGRES_PASSWORD` manually in `.env` and keep the file Git-ignored and
+private (`chmod 600 .env`). Editing its value does
+**not** rotate the password in an initialized database, so reuse the existing
+administrator password with existing storage. The same password is passed to
+Pi as `PGPASSWORD` and to PostgreSQL as `POSTGRES_PASSWORD`. Docker administrators
+and `docker compose config` can reveal these environment values.
 
 PostgreSQL stores data in its own project-scoped volume, normally
 **`pi-box_postgres`**, mounted at `/var/lib/postgresql/data`. It survives container
-recreation. Bootstrap runs only when this storage is empty.
+recreation. PostgreSQL initializes storage only when this volume is empty.
 `make replace` replaces **Pi only**, leaving the database container alone;
 `make up` starts all services selected in `.env`. Volumes are not backups. Never use
 `down -v` on data you need, share writable database storage between containers,
@@ -210,8 +215,8 @@ docker compose stop db
 Run that while the PostgreSQL overlay is still selected. To return Pi to its
 normal environment, then change `.env` to `COMPOSE_FILE=compose.yaml` and run
 `make up`. Removing a file from the selection does not automatically stop a
-previously running service or delete its data. The passwords may remain in
-`.env`; Pi-only mode does not pass them into Pi.
+previously running service or delete its data. The password may remain in
+`.env`; Pi-only mode does not pass it into Pi.
 
 Direct Compose commands use the same local selection automatically:
 
@@ -220,7 +225,7 @@ docker compose logs db
 ```
 
 For an independent instance, use a different Compose project name and Pi
-container/volume settings, with its own private `.env` and passwords.
+container/volume settings, with its own private `.env` and password.
 
 This is a minimal local development service—not a production database setup or
 an automatic backup, upgrade or password-management system.
@@ -379,8 +384,8 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/smoke.mjs`: image acceptance, runnable separately with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 - `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and persistent storage across full teardown/recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
-- `tests/postgres-configuration.test.mjs`: credential generation and optional PostgreSQL configuration.
-- `tests/postgres-integration.mjs`: automatic `.env` file selection/overrides, PostgreSQL on/off selection, authenticated SQL/CRUD from Pi, restricted role, no published DB port, and persistent data after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
+- `tests/compose-configuration.test.mjs`: native Compose overrides and private local configuration.
+- `tests/postgres-integration.mjs`: automatic `.env` file selection/overrides, PostgreSQL on/off selection, authenticated SQL/CRUD from Pi with one administrator login, no published DB port, and persistent data after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
 - `tests/integration.mjs`: host tests, both image suites, then Compose and PostgreSQL acceptance (Docker only).
 
 The smoke suite checks startup, shared tool availability (including version checks for nano, micro, nnn, bat, ripgrep and fd in both variants), pinned package presence/absence, extension registration (including `/usage` and `/lsp`), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.

@@ -6,8 +6,8 @@ services:
       PGHOST: db
       PGPORT: "5432"
       PGDATABASE: appdb
-      PGUSER: app
-      PGPASSWORD: ${APP_DB_PASSWORD:?Run make generate-db-credentials to add credentials to .env}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your private .env}
     depends_on:
       db:
         condition: service_healthy
@@ -20,16 +20,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: appdb
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make generate-db-credentials to add credentials to .env}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run make generate-db-credentials to add credentials to .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your private .env}
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     volumes:
       - postgres:/var/lib/postgresql/data
-      - ./container/bootstrap-app-role.sh:/docker-entrypoint-initdb.d/10-bootstrap-app-role.sh:ro
     healthcheck:
-      # TCP avoids the temporary socket-only init server; authenticate as the app
-      # so a stale/mismatched password fails readiness instead of looking healthy.
-      test: ["CMD-SHELL", "PGPASSWORD=\"$${APP_DB_PASSWORD}\" psql -h 127.0.0.1 -U app -d appdb -tAc 'SELECT 1' >/dev/null"]
+      # Authenticate over TCP; the temporary initialization server is socket-only.
+      test: ["CMD-SHELL", "PGPASSWORD=\"$${POSTGRES_PASSWORD}\" psql -h 127.0.0.1 -U postgres -d appdb -tAc 'SELECT 1' >/dev/null"]
       interval: 2s
       timeout: 3s
       retries: 30

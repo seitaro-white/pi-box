@@ -3,12 +3,8 @@
 # Compose reads file selection, image/storage overrides and credentials from .env.
 # No local configuration is required for the default Pi-only setup.
 
-# Refresh derived runtime files before Compose builds the image.
+# Build from committed dependency inputs; Docker derives the runtime files.
 build:
-	node container/prepare-runtime.mjs recommended
-	node container/prepare-runtime.mjs base container/base
-	npm --prefix container install --package-lock-only --ignore-scripts --no-audit --no-fund
-	npm --prefix container/base install --package-lock-only --ignore-scripts --no-audit --no-fund
 	docker compose build pi
 
 versions:

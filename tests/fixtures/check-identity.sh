@@ -14,7 +14,10 @@ rg --version >/dev/null
 fd --version >/dev/null
 psql --version | grep -E '^psql \(PostgreSQL\) 15\.' >/dev/null
 # The client is present in both variants, never the PostgreSQL server.
-! command -v postgres >/dev/null
+if command -v postgres >/dev/null; then
+    echo "PostgreSQL server must not be installed in the Pi image" >&2
+    exit 1
+fi
 test ! -w /opt/pi
 test "$(stat -c %a /home/node/.pi/agent)" = 700
 test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600

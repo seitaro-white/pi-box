@@ -146,9 +146,10 @@ Set these values manually in your private `.env` (choose your own password):
 
 ```dotenv
 COMPOSE_FILE=compose.yaml:compose.postgres.yaml
-POSTGRES_PASSWORD=<your-strong-private-password>
+POSTGRES_PASSWORD='your-strong-private-password'
 ```
 
+Single quotes keep characters such as `$` literal in Compose's `.env` parser.
 For an existing database, keep its current `POSTGRES_PASSWORD` unchanged.
 Then run from the host repository:
 

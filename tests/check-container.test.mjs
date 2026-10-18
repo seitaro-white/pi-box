@@ -17,32 +17,29 @@ const volumes = [
   { source: "git", target: "/home/node/.config/git" },
 ];
 
-for (const [scenario, mode, error] of [
-  ["fresh", "check"],
-  ["normal", "check"],
-  ["normal", "migrate"],
-  ["legacy", "check", /make migrate/],
-  ["legacy", "migrate"],
-  ["inherited-labels", "check", /make migrate/],
-  ["inherited-labels", "migrate"],
-  ["unsafe-git", "migrate", /non-persistent/],
-  ["unsafe-ssh", "check", /non-persistent/],
-  ["unsafe-link", "check", /non-persistent/],
-  ["mounts", "check", /Unexpected mounts/],
-  ["readonly", "check", /Unexpected mounts/],
-  ["bind", "check", /Unexpected mounts/],
-  ["stopped", "migrate", /Start .* first/],
-  ["shared-git", "migrate", /in use by other/],
-  ["foreign-project", "migrate", /another Compose project/],
-  ["foreign-service", "check", /another Compose project/],
-  ["renamed", "check", /differently named/],
-  ["bad-image", "check", /Git volume/],
-  ["bad-config", "check", /three writable named volumes/],
-  ["duplicate-volume", "check", /must be distinct/],
-  ["docker-error", "check", /synthetic daemon error/],
-  ["inspect-error", "check", /synthetic inspection error/],
+for (const [scenario, error] of [
+  ["fresh"],
+  ["normal"],
+  ["standalone", /not managed by this Compose project/],
+  ["inherited-labels", /not managed by this Compose project/],
+  ["unsafe-git", /non-persistent/],
+  ["unsafe-ssh", /non-persistent/],
+  ["unsafe-link", /non-persistent/],
+  ["mounts", /Unexpected mounts/],
+  ["readonly", /Unexpected mounts/],
+  ["bind", /Unexpected mounts/],
+  ["stopped", /Start .* first/],
+  ["shared-git", /in use by other/],
+  ["foreign-project", /not managed by this Compose project/],
+  ["foreign-service", /not managed by this Compose project/],
+  ["renamed", /differently named/],
+  ["bad-image", /Git volume/],
+  ["bad-config", /three writable named volumes/],
+  ["duplicate-volume", /must be distinct/],
+  ["docker-error", /synthetic daemon error/],
+  ["inspect-error", /synthetic inspection error/],
 ]) {
-  test(`Compose preflight: ${scenario} (${mode})`, () => {
+  test(`Compose preflight: ${scenario}`, () => {
     const dir = mkdtempSync(join(tmpdir(), "pi-box-preflight-"));
     try {
       const home = join(dir, "home");
@@ -95,7 +92,7 @@ if (args[0] === "compose") {
   if (scenario === "inspect-error") { console.error("synthetic inspection error"); process.exit(1); }
   console.log(JSON.stringify([{
     Id: "synthetic-container-id",
-    Config: { Labels: scenario === "legacy" || scenario === "unsafe-git" ? {} : {
+    Config: { Labels: scenario === "standalone" ? {} : {
       ...(scenario === "inherited-labels" ? {} : { "com.docker.compose.config-hash": "synthetic-hash" }),
       "com.docker.compose.project": scenario === "foreign-project" ? "other" : "pi-box",
       "com.docker.compose.service": scenario === "foreign-service" ? "other" : "pi",
@@ -118,7 +115,7 @@ if (args[0] === "compose") {
       );
       const result = spawnSync(
         process.execPath,
-        ["scripts/check-container.mjs", mode],
+        ["scripts/check-container.mjs"],
         {
           encoding: "utf8",
           env: {
@@ -139,15 +136,7 @@ if (args[0] === "compose") {
       const mutations = calls.filter((args) =>
         ["stop", "rm", "run", "volume"].includes(args[0]),
       );
-      assert.deepEqual(
-        mutations,
-        ["legacy", "inherited-labels"].includes(scenario) && mode === "migrate"
-          ? [
-              ["stop", "synthetic-container-id"],
-              ["rm", "synthetic-container-id"],
-            ]
-          : [],
-      );
+      assert.deepEqual(mutations, [], "preflight must always be read-only");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -155,7 +144,7 @@ if (args[0] === "compose") {
 }
 
 test("Make checks before Compose up/replace and uses Compose for attachment", () => {
-  for (const target of ["up", "replace", "migrate", "attach"]) {
+  for (const target of ["up", "replace", "attach"]) {
     const result = spawnSync("make", ["-n", target], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     const lines = result.stdout.split("\n");
@@ -163,11 +152,7 @@ test("Make checks before Compose up/replace and uses Compose for attachment", ()
     if (target === "attach") {
       assert.match(result.stdout, /docker compose exec pi tmux attach-session/);
     } else {
-      const check = lines.findIndex(
-        (line) =>
-          line ===
-          `node scripts/check-container.mjs ${target === "migrate" ? "migrate" : "check"}`,
-      );
+      const check = lines.indexOf("node scripts/check-container.mjs");
       assert.ok(check >= 0 && check < up, result.stdout);
       assert.match(lines[up], /--no-build --pull (never|missing)/);
       if (target === "replace")

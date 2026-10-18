@@ -109,88 +109,18 @@ try {
   compose(["start", "--wait", "--wait-timeout", "60", "pi"]);
   assertState();
 
-  // A genuine old docker-run container with the same volume names. Compose must
-  // refuse implicit takeover, then preserve data during the explicit handover.
+  // Full teardown/recreation must retain all three volumes, not just replacement.
   compose(["down"]); // Deliberately no -v: retain our canaries.
-  docker([
-    "run",
-    "-d",
-    "--name",
-    name,
-    "--cap-drop=ALL",
-    "--security-opt=no-new-privileges",
-    "-v",
-    `${env.WORKSPACE_VOLUME}:/workspace`,
-    "-v",
-    `${env.AGENT_VOLUME}:/home/node/.pi/agent`,
-    "-v",
-    `${env.GIT_VOLUME}:/home/node/.config/git`,
-    env.IMAGE,
-  ]);
-  // Legacy images have no Compose healthcheck; wait for their normal startup.
-  for (let attempt = 0; ; attempt++) {
-    const ready = spawnSync(
-      "docker",
-      ["exec", name, "tmux", "has-session", "-t", "=shell"],
-      options,
-    );
-    if (ready.status === 0) break;
-    if (attempt === 29) throw new Error("legacy startup timed out");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-  refuse("up", /make migrate/);
-  exec(["sh", "-c", "mkdir /home/node/.ssh"]);
-  refuse("migrate", /non-persistent/);
-  exec(["rmdir", "/home/node/.ssh"]);
-  make("migrate");
-  assert.equal(inspect().Config.Labels["com.docker.compose.project"], name);
+  make("up");
   assertState();
-
-  // Re-run the handover with genuinely pre-Compose, unlabelled volumes too.
-  // Keep the original canaries and use a second isolated set for this case.
   compose(["down"]);
-  for (const key of ["WORKSPACE_VOLUME", "AGENT_VOLUME", "GIT_VOLUME"])
-    env[key] += "-legacy";
-  for (const volume of [
-    env.WORKSPACE_VOLUME,
-    env.AGENT_VOLUME,
-    env.GIT_VOLUME,
-  ]) {
-    docker(["volume", "create", volume]);
-  }
-  docker([
-    "run",
-    "-d",
-    "--name",
-    name,
-    "-v",
-    `${env.WORKSPACE_VOLUME}:/workspace`,
-    "-v",
-    `${env.AGENT_VOLUME}:/home/node/.pi/agent`,
-    "-v",
-    `${env.GIT_VOLUME}:/home/node/.config/git`,
-    env.IMAGE,
-  ]);
-  // init may briefly be running; the migration check requires only a running
-  // container and safe files, and Compose then waits for its replacement.
-  exec(["sh", "-ec", "printf legacy > /workspace/legacy-canary"]);
-  make("migrate");
-  assert.equal(exec(["cat", "/workspace/legacy-canary"]), "legacy");
-  compose(["down"]);
-  docker([
-    "volume",
-    "rm",
-    ...volumes,
-    env.WORKSPACE_VOLUME,
-    env.AGENT_VOLUME,
-    env.GIT_VOLUME,
-  ]);
+  docker(["volume", "rm", ...volumes]);
   console.log(
-    "PASS: Compose fresh/idempotent startup, replacement, refusal guards and legacy migration with persistent storage.",
+    "PASS: Compose fresh/idempotent startup, replacement, refusal guards and persistent storage across teardown/recreation.",
   );
 } catch (error) {
   console.error(
-    `FAILED: retained isolated Compose project/container ${name}, volumes ${[...volumes, env.WORKSPACE_VOLUME, env.AGENT_VOLUME, env.GIT_VOLUME].join(", ")}`,
+    `FAILED: retained isolated Compose project/container ${name}, volumes ${volumes.join(", ")}`,
   );
   throw error;
 }

@@ -1,5 +1,4 @@
-// Compose owns the lifecycle. This preflight adds only our data-loss guards and
-// an explicit one-time handover for containers originally started with docker run.
+// Read-only data-loss guards before Compose starts or replaces Pi Box.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -59,10 +58,7 @@ function configuration() {
 }
 
 /** Refuse any replacement unless persistent mounts and disposable files are safe. */
-export function checkContainer(mode = "check") {
-  if (!["check", "migrate"].includes(mode)) {
-    throw new Error("Usage: node scripts/check-container.mjs {check|migrate}");
-  }
+export function checkContainer() {
   const { project, container, image, volumes } = configuration();
   const [metadata] = JSON.parse(docker(["image", "inspect", image]));
   if (
@@ -103,21 +99,18 @@ export function checkContainer(mode = "check") {
     "--format",
     "{{.Names}}",
   ]).split("\n");
-  let existing;
-  let legacy = false;
   if (names.includes(container)) {
-    [existing] = JSON.parse(docker(["container", "inspect", container]));
+    const [existing] = JSON.parse(docker(["container", "inspect", container]));
     const labels = existing.Config.Labels || {};
     // Compose can stamp project/service labels onto images too. Only a
     // container-specific config hash identifies a Compose-managed container.
-    legacy = !labels["com.docker.compose.config-hash"];
     if (
-      !legacy &&
-      (labels["com.docker.compose.project"] !== project ||
-        labels["com.docker.compose.service"] !== "pi")
+      !labels["com.docker.compose.config-hash"] ||
+      labels["com.docker.compose.project"] !== project ||
+      labels["com.docker.compose.service"] !== "pi"
     ) {
       throw new Error(
-        `${container} belongs to another Compose project or service; refusing to touch it.`,
+        `${container} is not managed by this Compose project/service. Handle it manually; refusing replacement.`,
       );
     }
     if (
@@ -159,16 +152,6 @@ export function checkContainer(mode = "check") {
     const other = users.find((name) => name && name !== container);
     if (other) throw new Error(`Volume ${volume.name} is in use by ${other}.`);
   }
-  if (legacy && mode !== "migrate") {
-    throw new Error(
-      `Existing ${container} was not created by Compose. Run make migrate for a checked, one-time handover. This ends running sessions.`,
-    );
-  }
-  if (legacy) {
-    // All checks finish before mutation. Use the inspected ID, not a reusable name.
-    docker(["stop", existing.Id], { stdio: "inherit" });
-    docker(["rm", existing.Id], { stdio: "inherit" });
-  }
   console.log(
     "Preflight passed. Files outside the three volumes may be lost on replacement; stop jobs and review work first.",
   );
@@ -179,7 +162,10 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   try {
-    checkContainer(process.argv[2]);
+    if (process.argv.length > 2) {
+      throw new Error("Usage: node scripts/check-container.mjs");
+    }
+    checkContainer();
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

@@ -50,7 +50,7 @@ docker compose exec pi bash # Open a separate shell (not tmux)
 
 The Makefile is a thin wrapper: Compose owns builds, networking, startup,
 recreation and health waiting. `scripts/check-container.mjs` adds only the
-storage checks and explicit legacy handover. **Use Make for startup/replacement:**
+read-only storage and replacement checks. **Use Make for startup/replacement:**
 direct `docker compose up` bypasses those checks. Don't run lifecycle commands
 concurrently.
 
@@ -76,27 +76,10 @@ can be lost, and root's home is not inspected. Extra/bind mounts, differently
 named existing services and foreign Compose projects require manual handling.
 
 A stopped existing container must be started before its files can be inspected:
-use `docker compose start --wait pi` for a Compose container, or
-`docker start pi-box-dev` for the old standalone container. This does not replace it.
+use `docker compose start --wait pi`. This does not replace it.
 
 **Never use `docker compose down -v` on storage you want to keep.** It deletes
 Compose-managed volumes. Ordinary `down` retains volumes but ends sessions.
-
-### One-time migration from the previous Docker-run setup
-
-Inspect and back up your existing storage first, finish running jobs, then run:
-
-```bash
-make migrate
-make attach
-```
-
-Migration builds the image, checks the existing `pi-box-dev` and all three
-mounts, then stops/removes **only that container** and starts the Compose
-replacement using the same volumes. Running sessions end. If its mounts differ
-or non-persistent Git files/SSH keys exist, migration refuses; preserve those
-files and resolve the layout manually first. No data is copied or reset.
-`make up` deliberately refuses implicit takeover of a standalone container.
 
 ### Image variants and overrides
 
@@ -118,8 +101,8 @@ You can override `IMAGE`, `TARGET`, `CONTAINER`, `WORKSPACE_VOLUME`,
 make up IMAGE=pi-box:custom WORKSPACE_VOLUME=my-workspace AGENT_VOLUME=my-agent GIT_VOLUME=my-git
 ```
 
-Use the **same overrides for every command**, including `attach`, `check` and
-`migrate`. Set a distinct project/container and three distinct volumes for an
+Use the **same project/container/volume overrides for every command**, including
+`attach` and `check`. Set a distinct project/container and three distinct volumes for an
 independent second instance; don't share writable volumes between instances.
 
 ## Optional PostgreSQL — development only
@@ -129,12 +112,11 @@ From the host repository:
 ```bash
 make generate-db-credentials  # Once: generate private .env.postgres credentials
 make up ENABLE_POSTGRES=1     # Start Pi Box and PostgreSQL; wait for readiness
-make attach ENABLE_POSTGRES=1
+make attach                  # Attach to the existing container; no flag needed
 ```
 
-If you still have the previous standalone Pi container, use
-`make migrate ENABLE_POSTGRES=1` instead of the first `up`. As usual, migration or a
-changed configuration ends running sessions; finish active work first.
+A changed image or configuration may replace Pi Box and end running sessions;
+finish active work first.
 
 `ENABLE_POSTGRES=1` selects [`compose.postgres.yaml`](compose.postgres.yaml) alongside
 the normal Compose file. Plain `make up` remains Pi-only. Both Pi image variants
@@ -187,7 +169,10 @@ make stop-postgres ENABLE_POSTGRES=1
 
 To return Pi to its normal environment, then run `make up` without `ENABLE_POSTGRES=1`.
 Omitting the option alone does not automatically stop an already-running database.
-Use `ENABLE_POSTGRES=1` consistently for database-enabled Make commands. A different
+Use `ENABLE_POSTGRES=1` for database-enabled `up`, `replace` and `stop-postgres`.
+It is not needed for `attach`, `build` or credential generation. Make does not
+remember the previous choice; `export ENABLE_POSTGRES=1` sets a default for Make
+commands in your current terminal. A different
 `POSTGRES_CREDENTIALS_FILE` can select a private credentials file for another instance;
 use a different `COMPOSE_PROJECT_NAME` (and Pi container/volume overrides) too.
 
@@ -325,7 +310,7 @@ Do not hand-edit `container/base/package.json` or either `defaults/settings.json
 
 ## Development tests
 
-Run focused host tests with Node's built-in runner—no dependency installation, container engine or model calls needed. They cover manifest consistency, fresh defaults, operator-state preservation, variant switching, legacy migration and safe refusal of broken settings:
+Run focused host tests with Node's built-in runner—no dependency installation, container engine or model calls needed. They cover manifest consistency, fresh defaults, operator-state preservation, variant switching, legacy settings reconciliation and safe refusal of broken settings:
 
 ```bash
 npm test
@@ -353,7 +338,7 @@ Test organization:
 - `tests/fixtures/`: container assertions and synthetic state, kept separate from host orchestration.
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/smoke.mjs`: image acceptance, runnable separately with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
-- `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and standalone-container migration using existing volumes, including unlabelled legacy volumes. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
+- `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and persistent storage across full teardown/recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
 - `tests/postgres-configuration.test.mjs`: credential generation and optional PostgreSQL configuration.
 - `tests/postgres-integration.mjs`: authenticated SQL/CRUD from Pi, restricted role, no published DB port, and data persistence after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
 - `tests/integration.mjs`: host tests, both image suites, then Compose and PostgreSQL acceptance (Docker only).
@@ -378,7 +363,7 @@ use global prune.
 
 ## Release status
 
-Local release candidate. Both image variants and the Compose lifecycle/migration
+Local release candidate. Both image variants and the Compose lifecycle/persistence
 suite, plus optional PostgreSQL SQL/persistence, have been verified on Apple
 Silicon macOS with Docker Desktop and Pi 1.3.0.
 See the runtime manifest for current pins. CI is configured to build and test

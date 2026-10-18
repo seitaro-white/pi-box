@@ -119,13 +119,12 @@ test(`${profile}: exact package pins and extension/tool/command registration`, a
       `/${command} command`,
     );
   }
+  assert.equal(process.env.PLANNOTATOR_REMOTE, undefined);
+  assert.equal(process.env.PLANNOTATOR_PORT, undefined);
   assert.equal(
-    process.env.PLANNOTATOR_REMOTE,
-    profile === "recommended" ? "1" : undefined,
-  );
-  assert.equal(
-    process.env.PLANNOTATOR_PORT,
-    profile === "recommended" ? "19432" : undefined,
+    existsSync("/opt/pi/node_modules/@plannotator/pi-extension"),
+    false,
+    "Plannotator is not bundled in the standard image",
   );
   assert.equal(
     loaded.some((extension) => extension.commands.has("lsp")),

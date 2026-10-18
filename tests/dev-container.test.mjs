@@ -14,21 +14,10 @@ import { spawnSync } from "node:child_process";
 for (const {
   scenario,
   profile = "recommended",
-  hostPort = "19432",
-  publish,
   status = 0,
-  error,
 } of [
-  { scenario: "normal", publish: "127.0.0.1:19432:19432" },
+  { scenario: "normal" },
   { scenario: "base", profile: "base" },
-  { scenario: "custom-port", hostPort: "29432", publish: "127.0.0.1:29432:19432" },
-  { scenario: "no-port", hostPort: "" },
-  {
-    scenario: "invalid-port",
-    hostPort: "65536",
-    status: 1,
-    error: /PLANNOTATOR_HOST_PORT must be/,
-  },
   { scenario: "unsafe-git", status: 1 },
   { scenario: "unsafe-ssh", status: 1 },
   { scenario: "mounts", status: 1 },
@@ -131,7 +120,6 @@ if (args[0] === "image") {
             WORKSPACE_VOLUME: "pi-box-workspace",
             AGENT_VOLUME: "pi-box-agent",
             GIT_VOLUME: "pi-box-git",
-            PLANNOTATOR_HOST_PORT: hostPort,
           },
         },
       );
@@ -149,14 +137,9 @@ if (args[0] === "image") {
       if (status === 0) {
         const run = calls.find((args) => args[0] === "run");
         assert.ok(run.includes("pi-box-git:/home/node/.config/git"));
-        const publishIndex = run.indexOf("--publish");
-        assert.equal(
-          publishIndex === -1 ? undefined : run[publishIndex + 1],
-          publish,
-        );
-      }
-      if (error) {
-        assert.match(result.stderr, error);
+        for (const flag of ["--publish", "-p", "--publish-all", "-P"]) {
+          assert.ok(!run.includes(flag), `no port publishing via ${flag}`);
+        }
       }
       assert.ok(
         !calls.some((args) => args[0] === "volume" && args[1] === "rm"),

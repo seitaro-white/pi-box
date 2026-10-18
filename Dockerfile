@@ -72,11 +72,6 @@ RUN node prepare-runtime.mjs recommended \
     && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
-# Bind inside the container for Docker forwarding; publish only on host loopback.
-# Remote mode prints the review URL instead of opening a container browser.
-ENV PI_BOX_PROFILE=recommended \
-    PLANNOTATOR_REMOTE=1 \
-    PLANNOTATOR_PORT=19432
-EXPOSE 19432
+ENV PI_BOX_PROFILE=recommended
 USER node
 WORKDIR /workspace

@@ -125,8 +125,8 @@ function checkContainer() {
   return true;
 }
 
-/** Require a Git-volume-aware image and derive its optional Plannotator arguments. */
-function getImageRunArgs() {
+/** Require a Git-volume-aware image before replacing the container. */
+function checkImage() {
   const [metadata] = JSON.parse(docker(["image", "inspect", image]));
   if (
     !metadata.Config.Env?.includes(
@@ -137,19 +137,6 @@ function getImageRunArgs() {
       "Image does not support the Git volume. Run make build first.",
     );
   }
-  if (!metadata.Config.Env?.includes("PI_BOX_PROFILE=recommended")) {
-    return [];
-  }
-  const port = process.env.PLANNOTATOR_HOST_PORT ?? "19432";
-  if (port === "") {
-    return [];
-  }
-  if (!/^[1-9]\d{0,4}$/.test(port) || Number(port) > 65535) {
-    throw new Error(
-      "PLANNOTATOR_HOST_PORT must be 1–65535, or empty to disable publishing.",
-    );
-  }
-  return ["--publish", `127.0.0.1:${port}:19432`];
 }
 
 /** Refuse to share writable volumes with another running container. */
@@ -197,7 +184,7 @@ async function waitForStartup() {
 /** Replace the container with the built image, ending sessions but retaining volumes. */
 async function replaceContainer() {
   // Validate configuration before stopping or removing an existing container.
-  const imageArgs = getImageRunArgs();
+  checkImage();
   const exists = checkContainer();
   checkVolumesNotShared();
   if (exists) {
@@ -216,7 +203,6 @@ async function replaceContainer() {
       ]),
       "--cap-drop=ALL",
       "--security-opt=no-new-privileges",
-      ...imageArgs,
       image,
     ],
     { stdio: "inherit" },

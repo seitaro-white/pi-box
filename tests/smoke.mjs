@@ -2,10 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
-import { createEngine, runCommand } from "./helpers/engine.mjs";
-
-const root = fileURLToPath(new URL("../", import.meta.url));
+import { createEngine } from "./helpers/engine.mjs";
 
 /**
  * Smoke-test one prebuilt image using only uniquely named, disposable resources.
@@ -24,7 +21,6 @@ async function runSmoke() {
     env.PI_BOX_IMAGE || `pi-box:0.2.0${profile === "base" ? "-base" : ""}`;
   const engine = createEngine(env);
   const name = `pi-box-smoke-${randomUUID()}`;
-  const web = `${name}-web`;
   const volumes = [
     { name: `${name}-workspace`, path: "/workspace" },
     { name: `${name}-agent`, path: "/home/node/.pi/agent" },
@@ -45,7 +41,7 @@ async function runSmoke() {
   /** Report only this run's resource names; never attempt cleanup after a failure. */
   function reportRetained() {
     console.error(
-      `FAILED: inspect retained resources ${[name, web, ...volumes.map((v) => v.name)].join(", ")}`,
+      `FAILED: inspect retained resources ${[name, ...volumes.map((v) => v.name)].join(", ")}`,
     );
   }
 
@@ -147,44 +143,6 @@ async function runSmoke() {
         await launch();
       }
       fixture("check-persistence.mjs", [`STORAGE_TRANSITION=${transition}`]);
-    }
-
-    if (profile === "recommended") {
-      // Only this separate, credential-free HTTP container gets networking.
-      engine.run([
-        "run",
-        "-d",
-        "--name",
-        web,
-        "--label",
-        label,
-        ...security,
-        "--publish",
-        "127.0.0.1::19432",
-        "-e",
-        "PLANNOTATOR_DATA_DIR=/tmp/plannotator-test",
-        image,
-      ]);
-      engine.run([
-        "cp",
-        fileURLToPath(
-          new URL("./fixtures/serve-plannotator.mjs", import.meta.url),
-        ),
-        `${web}:/tmp/serve-plannotator.mjs`,
-      ]);
-      engine.run(["exec", "-d", web, "node", "/tmp/serve-plannotator.mjs"]);
-      const address = engine.run(["port", web, "19432/tcp"]);
-      if (!/^127\.0\.0\.1:\d+$/.test(address)) {
-        throw new Error(
-          `Expected one host-loopback port mapping, got ${address}`,
-        );
-      }
-      runCommand(
-        process.execPath,
-        ["tests/fixtures/check-plannotator-http.mjs", address],
-        { cwd: root, env, inherit: true },
-      );
-      engine.run(["rm", "--force", web]);
     }
 
     engine.run(["rm", "--force", name]);

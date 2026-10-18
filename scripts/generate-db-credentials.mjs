@@ -3,10 +3,10 @@ import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 
 try {
-  const password = () => randomBytes(32).toString("hex");
+  const generateRandomPassword = () => randomBytes(32).toString("hex");
   writeFileSync(
-    process.env.DATABASE_ENV_FILE || ".env.postgres",
-    `POSTGRES_PASSWORD=${password()}\nAPP_DB_PASSWORD=${password()}\n`,
+    process.env.POSTGRES_CREDENTIALS_FILE || ".env.postgres",
+    `POSTGRES_PASSWORD=${generateRandomPassword()}\nAPP_DB_PASSWORD=${generateRandomPassword()}\n`,
     { flag: "wx", mode: 0o600 }, // Never overwrite credentials or follow symlinks.
   );
   console.log(

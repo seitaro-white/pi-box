@@ -127,16 +127,16 @@ independent second instance; don't share writable volumes between instances.
 From the host repository:
 
 ```bash
-make db-init                  # Once: generate private .env.postgres credentials
-make up DATABASE=1            # Start Pi Box and PostgreSQL; wait for readiness
-make attach DATABASE=1
+make generate-db-credentials  # Once: generate private .env.postgres credentials
+make up ENABLE_POSTGRES=1     # Start Pi Box and PostgreSQL; wait for readiness
+make attach ENABLE_POSTGRES=1
 ```
 
 If you still have the previous standalone Pi container, use
-`make migrate DATABASE=1` instead of the first `up`. As usual, migration or a
+`make migrate ENABLE_POSTGRES=1` instead of the first `up`. As usual, migration or a
 changed configuration ends running sessions; finish active work first.
 
-`DATABASE=1` selects [`compose.postgres.yaml`](compose.postgres.yaml) alongside
+`ENABLE_POSTGRES=1` selects [`compose.postgres.yaml`](compose.postgres.yaml) alongside
 the normal Compose file. Plain `make up` remains Pi-only. Both Pi image variants
 include Debian's PostgreSQL 15 client; the server image is a digest-pinned,
 multi-architecture PostgreSQL 15 image. There is no extra package repository.
@@ -156,13 +156,16 @@ not the database container. No host/SSH port forwarding is needed.
 
 The `app` role owns `appdb` and can create tables, run migrations and read/write
 its data. It is **not a superuser** and cannot create roles or databases.
-Pi receives only the app password, not the administrator password. First startup
-creates this role and ownership only—no demo tables or sample data.
+Pi receives only the app password, not the administrator password.
+[`bootstrap-app-role.sh`](container/bootstrap-app-role.sh) runs inside PostgreSQL
+on first startup to create this role and ownership only—no demo tables or sample data.
 
 ### Credentials and persistence
 
-`make db-init` creates `.env.postgres` with random, separate app/admin passwords
-and mode `0600`. It refuses to overwrite an existing file. The file is Git-ignored
+`make generate-db-credentials` runs
+[`generate-db-credentials.mjs`](scripts/generate-db-credentials.mjs) on the host.
+It only creates `.env.postgres` with random, separate app/admin passwords
+and file permissions `0600`. It refuses to overwrite an existing file. The file is Git-ignored
 and excluded from image builds. Keep it private and keep using it: changing the
 file does **not** change passwords in an already-initialized database. Password
 rotation is manual. Credentials are supplied as container environment variables,
@@ -170,22 +173,22 @@ so Docker administrators and `docker compose config` can reveal them.
 
 PostgreSQL stores data in its own project-scoped volume, normally
 **`pi-box_postgres`**, mounted at `/var/lib/postgresql/data`. It survives container
-recreation. Bootstrap runs only when this storage is empty. `make replace
-DATABASE=1` replaces **Pi only**, leaving the database container alone; use
-`make up DATABASE=1` to start both services. Volumes are not backups. Never use
+recreation. Bootstrap runs only when this storage is empty.
+`make replace ENABLE_POSTGRES=1` replaces **Pi only**, leaving the database
+container alone; use `make up ENABLE_POSTGRES=1` to start both services. Volumes are not backups. Never use
 `down -v` on data you need, share writable database storage between containers,
 or change the server's major version without a PostgreSQL data migration.
 
 To stop the database without deleting its data:
 
 ```bash
-make db-stop DATABASE=1
+make stop-postgres ENABLE_POSTGRES=1
 ```
 
-To return Pi to its normal environment, then run `make up` without `DATABASE=1`.
+To return Pi to its normal environment, then run `make up` without `ENABLE_POSTGRES=1`.
 Omitting the option alone does not automatically stop an already-running database.
-Use `DATABASE=1` consistently for database-enabled Make commands. A different
-`DATABASE_ENV_FILE` can select a private credentials file for another instance;
+Use `ENABLE_POSTGRES=1` consistently for database-enabled Make commands. A different
+`POSTGRES_CREDENTIALS_FILE` can select a private credentials file for another instance;
 use a different `COMPOSE_PROJECT_NAME` (and Pi container/volume overrides) too.
 
 For direct Compose inspection, select the same files explicitly:
@@ -351,7 +354,8 @@ Test organization:
 - `tests/helpers/`: shared setup, cleanup and engine selection.
 - `tests/smoke.mjs`: image acceptance, runnable separately with `node tests/smoke.mjs` or `PI_BOX_PROFILE=base node tests/smoke.mjs`.
 - `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and standalone-container migration using existing volumes, including unlabelled legacy volumes. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
-- `tests/postgres.mjs`: authenticated SQL/CRUD from Pi, restricted role, no published DB port, and data persistence after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres.mjs`.
+- `tests/postgres-configuration.test.mjs`: credential generation and optional PostgreSQL configuration.
+- `tests/postgres-integration.mjs`: authenticated SQL/CRUD from Pi, restricted role, no published DB port, and data persistence after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
 - `tests/integration.mjs`: host tests, both image suites, then Compose and PostgreSQL acceptance (Docker only).
 
 The smoke suite checks startup, shared tool availability (including version checks for nano, micro, nnn, bat, ripgrep and fd in both variants), pinned package presence/absence, extension registration (including `/usage` and `/lsp`), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.

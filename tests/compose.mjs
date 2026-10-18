@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const name = `pi-box-compose-${randomUUID()}`;
 const env = {
   ...process.env,
-  DATABASE: "0",
+  ENABLE_POSTGRES: "0",
   COMPOSE_FILE: fileURLToPath(new URL("../compose.yaml", import.meta.url)),
   COMPOSE_PROJECT_NAME: name,
   CONTAINER: name,

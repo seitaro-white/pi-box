@@ -92,4 +92,4 @@ jobs:
         run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/compose.mjs
 
       - name: Verify optional PostgreSQL
-        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/postgres.mjs
+        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/postgres-integration.mjs

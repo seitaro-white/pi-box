@@ -25,7 +25,7 @@ function runIntegration() {
   }
   if (!env.PI_BOX_ENGINE || env.PI_BOX_ENGINE === "docker") {
     runCommand(process.execPath, ["tests/compose.mjs"], options);
-    runCommand(process.execPath, ["tests/postgres.mjs"], options);
+    runCommand(process.execPath, ["tests/postgres-integration.mjs"], options);
   }
 }
 

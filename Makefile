@@ -1,4 +1,4 @@
-.PHONY: build runtime check replace migrate attach up versions db-init db-stop
+.PHONY: build runtime check replace migrate attach up versions generate-db-credentials stop-postgres
 
 IMAGE ?= pi-box:0.2.0
 TARGET ?= recommended
@@ -9,15 +9,15 @@ GIT_VOLUME ?= pi-box-git
 export IMAGE TARGET CONTAINER WORKSPACE_VOLUME AGENT_VOLUME GIT_VOLUME
 
 # One optional overlay, not a second lifecycle implementation.
-DATABASE ?= 0
-DATABASE_ENV_FILE ?= .env.postgres
-ifeq ($(DATABASE),1)
+ENABLE_POSTGRES ?= 0
+POSTGRES_CREDENTIALS_FILE ?= .env.postgres
+ifeq ($(ENABLE_POSTGRES),1)
 COMPOSE_FILE ?= compose.yaml:compose.postgres.yaml
-COMPOSE_ENV_FILES ?= $(DATABASE_ENV_FILE)
+COMPOSE_ENV_FILES ?= $(POSTGRES_CREDENTIALS_FILE)
 export COMPOSE_ENV_FILES
 endif
 COMPOSE_FILE ?= compose.yaml
-export DATABASE DATABASE_ENV_FILE COMPOSE_FILE
+export ENABLE_POSTGRES POSTGRES_CREDENTIALS_FILE COMPOSE_FILE
 
 # Refresh derived runtime files before Compose builds the image.
 build: runtime
@@ -32,11 +32,11 @@ runtime:
 versions:
 	node scripts/check-versions.mjs
 
-db-init:
-	node scripts/init-database.mjs
+generate-db-credentials:
+	node scripts/generate-db-credentials.mjs
 
-db-stop:
-	@test "$(DATABASE)" = 1 || { echo 'Use make db-stop DATABASE=1' >&2; exit 1; }
+stop-postgres:
+	@test "$(ENABLE_POSTGRES)" = 1 || { echo 'Use make stop-postgres ENABLE_POSTGRES=1' >&2; exit 1; }
 	docker compose stop db
 
 check:

@@ -8,6 +8,7 @@ Comes installed with:
 - [tmux](https://github.com/tmux/tmux/wiki) for persistent, reconnectable sessions
 - micro and nano terminal text editors
 - nnn terminal file manager and bat syntax-highlighted file viewer
+  - Both image variants default to `EDITOR=micro`, `VISUAL=micro` and `PAGER=bat`
 - Git, ripgrep (`rg`) and fd
 - Python and uv
 - JavaScript tooling: Node.js and npm

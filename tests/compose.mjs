@@ -68,10 +68,10 @@ function assertState() {
 
 try {
   const config = JSON.parse(compose(["config", "--format", "json"]));
-  assert.deepEqual(Object.keys(config.services), ["pi"]);
-  assert.equal(config.services.pi.build.target, "recommended");
+  assert.deepEqual(Object.keys(config.services), ["pi-box"]);
+  assert.equal(config.services["pi-box"].build.target, "recommended");
   assert.equal(
-    config.services.pi.ports,
+    config.services["pi-box"].ports,
     undefined,
     "standard Compose publishes no ports",
   );
@@ -106,9 +106,9 @@ try {
     refuse(target, /non-persistent/);
     exec(["rm", "/home/node/.gitconfig"]);
   }
-  compose(["stop", "pi"]);
+  compose(["stop", "pi-box"]);
   refuse("replace", /Start .* first/);
-  compose(["start", "--wait", "--wait-timeout", "60", "pi"]);
+  compose(["start", "--wait", "--wait-timeout", "60", "pi-box"]);
   assertState();
 
   // Full teardown/recreation must retain all three volumes, not just replacement.

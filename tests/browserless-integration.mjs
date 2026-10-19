@@ -55,9 +55,9 @@ const config = (files) =>
 	);
 try {
 	const plain = config(["compose.yaml"]);
-	assert.deepEqual(Object.keys(plain.services), ["pi"]);
-	assert.equal(plain.services.pi.environment?.BROWSER_TOKEN, undefined);
-	assert.equal(plain.services.pi.environment?.BROWSER_CDP_URL, undefined);
+	assert.deepEqual(Object.keys(plain.services), ["pi-box"]);
+	assert.equal(plain.services["pi-box"].environment?.BROWSER_TOKEN, undefined);
+	assert.equal(plain.services["pi-box"].environment?.BROWSER_CDP_URL, undefined);
 	const combined = JSON.parse(
 		runCommand(
 			"docker",
@@ -79,21 +79,21 @@ try {
 			},
 		),
 	);
-	assert.deepEqual(Object.keys(combined.services.pi.depends_on).sort(), [
+	assert.deepEqual(Object.keys(combined.services["pi-box"].depends_on).sort(), [
 		"browser",
-		"db",
+		"postgres",
 	]);
-	assert.equal(combined.services.pi.environment.PGHOST, "db");
+	assert.equal(combined.services["pi-box"].environment.PGHOST, "postgres");
 	assert.equal(
-		combined.services.pi.environment.PGPASSWORD,
+		combined.services["pi-box"].environment.PGPASSWORD,
 		"disposable-config-only",
 	);
 	assert.equal(
-		combined.services.pi.environment.BROWSER_TOKEN,
+		combined.services["pi-box"].environment.BROWSER_TOKEN,
 		settings.BROWSER_TOKEN,
 	);
 	assert.equal(
-		combined.services.pi.environment.BROWSER_CDP_URL,
+		combined.services["pi-box"].environment.BROWSER_CDP_URL,
 		"ws://browser:3000/chromium",
 	);
 	const browserConfig = combined.services.browser;
@@ -119,12 +119,12 @@ try {
 	compose([
 		"cp",
 		join(root, "tests/fixtures/browserless"),
-		"pi:/tmp/browserless-client",
+		"pi-box:/tmp/browserless-client",
 	]);
 	compose([
 		"exec",
 		"-T",
-		"pi",
+		"pi-box",
 		"cp",
 		"-R",
 		"/tmp/browserless-client",
@@ -135,7 +135,7 @@ try {
 		"-T",
 		"-w",
 		"/workspace/browserless-client",
-		"pi",
+		"pi-box",
 		"npm",
 		"ci",
 		"--ignore-scripts",
@@ -151,7 +151,7 @@ try {
 			"-T",
 			"-w",
 			"/workspace/browserless-client",
-			"pi",
+			"pi-box",
 			"node",
 			"check.mjs",
 		],

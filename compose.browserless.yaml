@@ -1,6 +1,6 @@
 # Optional trusted-development browser; Chromium's sandbox is disabled upstream.
 services:
-  pi:
+  pi-box:
     environment:
       BROWSER_CDP_URL: ws://browser:3000/chromium
       BROWSER_TOKEN: ${BROWSER_TOKEN:?Set BROWSER_TOKEN in your private .env}

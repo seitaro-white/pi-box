@@ -4,6 +4,9 @@ set -eu
 
 test "$PI_BOX_PROFILE" = "$EXPECTED_PROFILE"
 test "$(id -u)" = 1000
+test "$EDITOR" = micro
+test "$VISUAL" = micro
+test "$PAGER" = bat
 test "$(pi --version)" = "$EXPECTED_PI_VERSION"
 for tool in git nano micro nnn bat rg fd uv python tmux psql; do command -v "$tool" >/dev/null; done
 nano --version >/dev/null

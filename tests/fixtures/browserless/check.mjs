@@ -26,7 +26,7 @@ try {
 				const context = await browser.newContext();
 				try {
 					const page = await context.newPage();
-					await page.goto("http://pi:8123");
+					await page.goto("http://pi-box:8123");
 					await page.getByRole("button").click();
 					assert.equal(await page.getByRole("button").textContent(), "clicked");
 					if (session === 0) {

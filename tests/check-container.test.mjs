@@ -33,6 +33,8 @@ for (const [scenario, error] of [
   ["foreign-project", /not managed by this Compose project/],
   ["foreign-service", /not managed by this Compose project/],
   ["renamed", /differently named/],
+  ["legacy-pi", /Legacy Compose service pi found/],
+  ["legacy-db", /Legacy Compose service db found/],
   ["bad-image", /Git volume/],
   ["bad-config", /three writable named volumes/],
   ["duplicate-volume", /must be distinct/],
@@ -76,8 +78,8 @@ if (scenario === "docker-error") {
 }
 if (args[0] === "compose") {
   console.log(JSON.stringify({
-    name: "pi-box", services: { pi: {
-      container_name: "pi-box-dev", image: "pi-box:test",
+    name: "pi-box", services: { "pi-box": {
+      container_name: "pi-box-main-container", image: "pi-box:test",
       volumes: scenario === "bad-config" ? [] : volumes.map(v => ({ ...v, type: "volume" })),
     } },
     volumes: Object.fromEntries(volumes.map(v => [v.source, { name: scenario === "duplicate-volume" ? "same" : "pi-box-" + v.source }])),
@@ -86,8 +88,10 @@ if (args[0] === "compose") {
   console.log(JSON.stringify([{ Config: { Env: scenario === "bad-image" ? [] : ["GIT_CONFIG_GLOBAL=/home/node/.config/git/config"] } }]));
 } else if (args[0] === "container" && args[1] === "ls") {
   if (args.includes("--filter")) {
-    if (scenario === "renamed") console.log("old-name");
-  } else if (scenario !== "fresh") console.log("pi-box-dev");
+    if (scenario === "renamed" && args.includes("label=com.docker.compose.service=pi-box")) console.log("old-name");
+    if (scenario === "legacy-pi" && args.includes("label=com.docker.compose.service=pi")) console.log("legacy-dev");
+    if (scenario === "legacy-db" && args.includes("label=com.docker.compose.service=db")) console.log("legacy-postgres");
+  } else if (scenario !== "fresh") console.log("pi-box-main-container");
 } else if (args[0] === "container" && args[1] === "inspect") {
   if (scenario === "inspect-error") { console.error("synthetic inspection error"); process.exit(1); }
   console.log(JSON.stringify([{
@@ -95,7 +99,7 @@ if (args[0] === "compose") {
     Config: { Labels: scenario === "standalone" ? {} : {
       ...(scenario === "inherited-labels" ? {} : { "com.docker.compose.config-hash": "synthetic-hash" }),
       "com.docker.compose.project": scenario === "foreign-project" ? "other" : "pi-box",
-      "com.docker.compose.service": scenario === "foreign-service" ? "other" : "pi",
+      "com.docker.compose.service": scenario === "foreign-service" ? "other" : "pi-box",
     } },
     State: { Running: scenario !== "stopped" },
     Mounts: (scenario === "mounts" ? volumes.slice(0, 2) : volumes).map(v => ({
@@ -133,6 +137,13 @@ if (args[0] === "compose") {
         .trim()
         .split("\n")
         .map(JSON.parse);
+      for (const service of ["pi", "db"]) {
+        const legacyCheck = calls.find((args) =>
+          args.includes(`label=com.docker.compose.service=${service}`),
+        );
+        if (legacyCheck) assert.ok(legacyCheck.includes("--all"), "check stopped legacy containers too");
+        if (["fresh", "normal"].includes(scenario)) assert.ok(legacyCheck, `check legacy service ${service}`);
+      }
       const mutations = calls.filter((args) =>
         ["stop", "rm", "run", "volume"].includes(args[0]),
       );
@@ -150,7 +161,7 @@ test("Make checks before Compose up/replace and uses Compose for attachment", ()
     const lines = result.stdout.split("\n");
     const up = lines.findIndex((line) => line.startsWith("docker compose up "));
     if (target === "attach") {
-      assert.match(result.stdout, /docker compose exec pi tmux attach-session/);
+      assert.match(result.stdout, /docker compose exec pi-box tmux attach-session/);
     } else {
       const check = lines.indexOf("node scripts/check-container.mjs");
       assert.ok(check >= 0 && check < up, result.stdout);

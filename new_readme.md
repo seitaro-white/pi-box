@@ -27,7 +27,7 @@ Pi box is a (slightly trimmed down) version of what I am actually using for deve
 
 ## Installation
 
-Pre-requisites: Docker (with Compose v2.24), Node, Npm and Make.
+Pre-requisites: Docker (with Compose v5.0+), Node, Npm and Make.
 
 With Docker running, run:
 

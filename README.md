@@ -18,9 +18,9 @@ This is my personal remote development setup for coding, which I thought I'd sha
 
 ## Quickstart — install and run locally
 
-Install Docker with **Docker Compose v2.24+**, Node.js 18+ (including npm), and
-Make. Docker Desktop includes Compose. Run commands from your **host terminal**
-in this repository, with Docker running.
+Install Docker with **Docker Compose v5.0+**, Node.js 18+ (including npm), and
+Make. Docker Desktop includes Compose. Run commands from your **host terminal** in this
+repository, with Docker running.
 
 ### Everyday commands
 
@@ -435,6 +435,8 @@ npm run test:integration
 This runs host tests, both image smoke suites, Compose acceptance and the focused
 PostgreSQL integration test. It uses prebuilt Pi images, pulls the pinned database
 image if needed, and uses disposable storage/credentials—not your running setup.
+CI pins Docker Compose **v5.6.0** on both native Linux AMD64 and ARM64 runners;
+the setup action logs the installed version.
 For different image tags:
 
 ```bash

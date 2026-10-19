@@ -22,6 +22,7 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
   - [Base image](#base-image)
   - [Git setup](#git-setup)
   - [Optional services: PostgreSQL](#optional-services-postgresql)
+  - [Optional services: Browserless Chromium](#optional-services-browserless-chromium)
   - [Multiple Pi-box instances](#multiple-pi-box-instances)
   - [Running in a virtual machine](#running-in-a-virtual-machine)
   - [Tailscale](#tailscale)
@@ -29,7 +30,7 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
 
 ## Installation and usage
 
-Prerequisites: Docker with Compose v2.24 or newer.
+Prerequisites: Docker with Compose v5.0 or newer.
 
 With Docker running, run:
 
@@ -51,7 +52,7 @@ There are also convenience targets in `Makefile`. The workspace, Pi settings and
 
 ## Architecture
 
-Pi-box includes a main dev container that contains Pi and basic dev tools, as well as an optional PostgreSQL sidecar. These are managed with Docker Compose.
+Pi-box includes a main dev container that contains Pi and basic dev tools, with optional PostgreSQL and Browserless Chromium sidecars. These are managed with Docker Compose.
 
 
 ```mermaid
@@ -59,7 +60,9 @@ flowchart TD
     subgraph compose["Containers managed by Docker Compose"]
         pi["Pi Box: tmux, Pi, extensions and dev tools"]
         db["Optional PostgreSQL container"]
+        browser["Optional Browserless Chromium container"]
         pi -. "postgres:5432" .-> db
+        pi -. "CDP: browser:3000" .-> browser
     end
 
     subgraph volumes["Persistent volumes"]
@@ -77,7 +80,7 @@ flowchart TD
     classDef core fill:#dbeafe,stroke:#2563eb,color:#172554
     classDef optional fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-dasharray:5 5
     class pi,workspace,agent,git core
-    class db,data optional
+    class db,data,browser optional
 ```
 
 
@@ -107,6 +110,7 @@ The default image includes:
 
 - **Sidecars**
     - **PostgreSQL Server** - Optional local database server intended for development/testing, not production.
+    - **Browserless Chromium** - Optional headless browser accessed over CDP; trusted development only, with SSPL/commercial licensing and Chromium's sandbox disabled upstream.
 
 ### What about skills?
 
@@ -143,6 +147,19 @@ POSTGRES_PASSWORD='your-private-password'
 Run `make up` to build and start the selected services. Pi connects to `postgres:5432` using the supplied `PG*` environment variables; no database port is published to the host. It has database administrator access, so keep this separate from production data. PostgreSQL has its own persistent volume; changing `.env` does not rotate an existing database password.
 
 Other development services can follow the same overlay pattern, with their own configuration and storage. Removing an overlay from the selection does not automatically stop its existing containers.
+
+### Optional services: Browserless Chromium
+
+Select the browser overlay in your private `.env`:
+
+```dotenv
+COMPOSE_FILE=compose.yaml:compose.browserless.yaml
+BROWSER_TOKEN='your-own-strong-private-token'
+```
+
+Run `chmod 600 .env` and `make up`. Pi receives `BROWSER_CDP_URL` and `BROWSER_TOKEN`; install your own browser client in your project. To include PostgreSQL too, use `COMPOSE_FILE=compose.yaml:compose.postgres.yaml:compose.browserless.yaml` and also set `POSTGRES_PASSWORD`.
+
+The pinned upstream browser publishes no host ports and has no persistent storage. It uses **SSPL/commercial licensing** and disables Chromium's sandbox, so use it only for trusted development. See the [Browserless guide](docs/browserless.md) for client examples, session cleanup, licensing and security details.
 
 ### Tailscale
 

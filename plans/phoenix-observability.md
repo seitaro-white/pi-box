@@ -4,7 +4,7 @@ Status: implemented and validated in the isolated worktree; the compatibility ga
 
 ## Minimal scope
 
-- At the operator's implementation request, work only in the fresh `/Users/josephwhite/gitrepos/pi-box-phoenix` worktree, branch `feat/arize-observability`, based on `feat/langfuse-observability`. Do not modify the separate Chromium checkout or merge its unfinished work.
+- At the operator's implementation request, work only in the fresh `/Users/josephwhite/gitrepos/pi-box-phoenix` worktree, branch `feat/arize-observability`, based on `feat/langfuse-observability`. The original implementation did not modify the separate Chromium checkout or merge its unfinished work. After Chromium landed, updated main was merged into this feature branch for integration preparation; see the validation notes.
 - One optional `compose.phoenix.yaml` overlay adds **one Phoenix container**, using SQLite in a project-scoped named volume. No PostgreSQL dependency, collector, proxy, Redis or other backend.
 - Pi exports traces directly through **NikiforovAll/pi-otel** (`pi-otel` on npm), not the unrelated jcpowermac project.
 - Default Pi-only Compose, images, installed packages, settings and lifecycle behavior remain unchanged. No automatic installation into the persistent agent directory; no global OTEL environment defaults.
@@ -68,7 +68,7 @@ Use a unique Compose project **and override this repository's explicit Pi contai
 
 ## Later, only if needed
 
-Anything beyond local full-content trace viewing requires demonstrated need, not speculative implementation. No cost normalization, subagent correlation, architecture matrix, backup/retention tooling or extra telemetry backends in MVP. Reconcile Chromium composition only after that work lands.
+Anything beyond local full-content trace viewing requires demonstrated need, not speculative implementation. No cost normalization, subagent correlation, architecture matrix, backup/retention tooling or extra telemetry backends in MVP. Chromium has since landed in main; its composition with Phoenix was reconciled and validated during merge preparation, without changing the Browserless overlay.
 
 ## Sources
 

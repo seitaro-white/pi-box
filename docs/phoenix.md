@@ -143,10 +143,11 @@ PI_BOX_IMAGE=pi-box:0.2.0 node tests/phoenix-integration.mjs
 ```
 
 The runner pulls the pinned backend and installs `pi-otel@0.3.0` only into
-disposable agent storage. It checks every combination of the optional Compose
-overlays, stored native trace fields, normal-exit flushing, explicit disable,
-SQLite recreation, and an unreachable backend at session start. It uses synthetic
-model output and real Pi tool calls; no model credentials are needed. Successful
+disposable agent storage. It resolves every combination of the optional Compose
+overlays, then runs Pi + Phoenix to check stored native trace fields, normal-exit
+flushing, explicit disable, SQLite recreation, and an unreachable backend at
+session start. It uses synthetic model output and real Pi tool calls; no model
+credentials are needed. Successful
 runs clean up only their own resources; failures retain an isolated project and
 print its name/directory for inspection. Web UI inspection was performed
 separately, as recorded in the validation notes.

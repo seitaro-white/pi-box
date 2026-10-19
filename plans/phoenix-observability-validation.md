@@ -13,9 +13,10 @@
   Runtime fixture used prebuilt base image `pi-box:shared-editors-base-check`
   (`39a4d370f40e`), verifying its Pi version against the repository manifest;
   no Pi image rebuild was needed because image inputs are unchanged.
-- Worktree: `pi-box-phoenix`, branch `feat/arize-observability`; no Chromium
-  changes were merged or modified. Disposable runtime testing was explicitly
-  approved by the operator.
+- Worktree: `pi-box-phoenix`, branch `feat/arize-observability`; the initial
+  implementation did not merge or modify unfinished Chromium work. Updated main
+  was integrated afterward as recorded below. Disposable runtime testing was
+  explicitly approved by the operator.
 
 ## Compatibility gate — passed before adding the overlay
 
@@ -89,6 +90,40 @@ production dependency.
   resources explicitly removed. Fixtures are now copied into container-local
   test storage after preflight, with no extra Pi mount. No runtime defaults,
   preflight rules, Docker settings or Chromium work were changed.
+
+## Merge preparation against updated main — passed
+
+After Chromium landed, `main` at `a53b3d9` was merged into the Phoenix feature
+branch (`4858839`), without changing the main checkout or live configuration.
+The original implementation was committed first as `d87e469`.
+
+- Resolved `.env.example` and README conflicts. Preserved main's rewritten README,
+  Browserless guide, shared editor defaults and Compose/CI updates. Moved detailed
+  Phoenix setup/privacy/shutdown/test instructions to `docs/phoenix.md`, linked
+  from the current README; added Phoenix to the architecture diagram.
+- `.env.example` retains Pi-only as its sole enabled selection, with commented
+  Phoenix examples alone, alongside PostgreSQL, alongside Browserless, and with
+  both. No default image/package/settings, existing overlays or lifecycle scripts
+  differ from main.
+- Expanded the Phoenix runner to resolve all **eight optional-service selections**
+  (PostgreSQL/Browserless/Phoenix on or off), checking Phoenix first/last in the
+  overlay order. All pre-existing service definitions and volumes remain unchanged
+  when Phoenix is added. This is configuration coverage, not a claim that all
+  three sidecars were exercised simultaneously.
+- Host tests: **45 passed, 0 failed**, including a guide/settings consistency test.
+  Biome CLI checks, Biome LSP diagnostics and whitespace checks pass.
+- Re-ran the full Phoenix disposable acceptance with prebuilt **recommended**
+  image `pi-box:shared-editors-check` (`8499e0c20f5e`), Pi 1.3.0, the same pinned
+  pi-otel/Phoenix artifacts, and Docker Desktop ARM64. Native traces, flush,
+  explicit disable, SQLite recreation and unavailable-at-start checks passed.
+  Whole-CLI timings: enabled **417ms**, disabled **323ms**, unavailable **624ms**.
+- Re-ran existing Browserless acceptance with the same recommended image: optional
+  and PostgreSQL-combined configuration, health/lifecycle, missing-token rejection,
+  DOM action, PNG/PDF output and fresh-session checks passed.
+- Both runners exited 0 and removed their owned resources. No model credentials
+  or live `.env`/volumes were used. No new full image rebuild, full smoke/Compose/
+  PostgreSQL runtime suite, AMD64 run or UI reinspection was performed for this
+  reconciliation; the original Phoenix UI inspection remains recorded above.
 
 ## Repeatable validation
 

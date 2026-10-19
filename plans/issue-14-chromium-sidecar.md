@@ -2,9 +2,9 @@
 
 Issue: https://github.com/seitaro-white/pi-box/issues/14
 
-Status: Browserless implemented and verified on native ARM64 Docker Desktop.
-Native AMD64 acceptance remains pending CI; no emulation result is claimed.
-The custom Chromium implementation remains reverted.
+Status: Browserless implemented and verified on native ARM64 Docker Desktop
+and native Linux AMD64/ARM64 CI. The custom Chromium implementation remains
+reverted.
 
 ## Goal and scope
 
@@ -72,7 +72,8 @@ pool management.
 
 ## 3. Brief usage documentation
 
-Update `README.md` and `.env.example` with these alternative selections:
+Keep the overview in `README.md` and detailed client/security guidance in
+`docs/browserless.md`. Update the README and `.env.example` with these alternative selections:
 
 ```dotenv
 # Pi + Browserless Chromium
@@ -98,7 +99,7 @@ Include only:
 - The selected image's session timeout and normal cleanup behavior; no promise
   of persistent state across connections.
 - Browser `localhost` means the browser container. Serve Pi apps on `0.0.0.0`
-  and visit `http://pi:PORT`. Pi files are not browser-side `file://` files; use
+  and visit `http://pi-box:PORT`. Pi files are not browser-side `file://` files; use
   HTTP or `page.setContent()`. Client-saved artifacts live in Pi.
 - Keep tokens private. This is a trusted-development service, not a multi-tenant
   security boundary. Enabling the overlay can recreate Pi and end sessions;
@@ -156,9 +157,11 @@ Report native architecture results explicitly; emulation is not native proof.
 - Full integration runner passed on ARM64: host tests, both Pi smoke suites,
   Compose, PostgreSQL and Browserless. Recommended image `pi-box:0.2.0`;
   base image `pi-box:personal-rebased-base-check` (prebuilt local images).
-- Existing native AMD64/ARM64 CI matrix now runs Browserless acceptance using
-  the same pinned overlay. CI has not been run from this local session; native
-  AMD64 results and fresh CI builds remain unverified.
+- [Native AMD64/ARM64 CI run 39265270704](https://github.com/seitaro-white/pi-box/actions/runs/39265270704)
+  passed host tests, fresh builds and smoke suites for both Pi variants, Compose,
+  PostgreSQL and Browserless acceptance using the same pinned overlay and Compose
+  v5.6.0. The Browserless integration was aligned with main's renamed `pi-box`
+  and `postgres` services.
 - Disposable compatibility/failed-attempt resources were cleaned after fixing
   fixture copy ownership; no operator containers, configuration or volumes changed.
 

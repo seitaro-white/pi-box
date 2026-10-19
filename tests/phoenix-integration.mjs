@@ -23,6 +23,7 @@ for (const path of [
   "compose.yaml",
   "compose.phoenix.yaml",
   "compose.postgres.yaml",
+  "compose.browserless.yaml",
   "scripts",
 ]) {
   cpSync(join(root, path), join(directory, path), { recursive: true });
@@ -43,6 +44,7 @@ const settings = {
   GIT_VOLUME: `${project}-git`,
   PHOENIX_UI_PORT: "0", // Docker allocates an unused loopback port.
   POSTGRES_PASSWORD: "synthetic-config-only-not-used-for-login",
+  BROWSER_TOKEN: "synthetic-browser-config-only-not-used-for-login",
 };
 writeFileSync(
   join(directory, ".env"),
@@ -236,17 +238,40 @@ try {
   assert.equal(phoenix.ports[0].target, 6006);
   assert.equal(phoenix.volumes.length, 1);
   assert.equal(selected.volumes.phoenix.name, `${project}_phoenix`);
-  const combined = config([
-    "compose.yaml",
-    "compose.postgres.yaml",
-    "compose.phoenix.yaml",
-  ]);
-  assert.deepEqual(Object.keys(combined.services).sort(), [
-    "phoenix",
-    "pi-box",
-    "postgres",
-  ]);
-  assert.equal(combined.services["pi-box"].depends_on.phoenix, undefined);
+  // Resolve every optional-service combination, including either Phoenix order.
+  // This is configuration-only: the runtime workflow still starts Pi + Phoenix.
+  for (const overlays of [
+    [],
+    ["compose.postgres.yaml"],
+    ["compose.browserless.yaml"],
+    ["compose.postgres.yaml", "compose.browserless.yaml"],
+  ]) {
+    const existing = config(["compose.yaml", ...overlays]);
+    for (const files of [
+      ["compose.yaml", ...overlays, "compose.phoenix.yaml"],
+      ["compose.yaml", "compose.phoenix.yaml", ...overlays],
+    ]) {
+      const combined = config(files);
+      assert.deepEqual(
+        Object.keys(combined.services).sort(),
+        [...Object.keys(existing.services), "phoenix"].sort(),
+      );
+      for (const [service, configuration] of Object.entries(
+        existing.services,
+      )) {
+        assert.deepEqual(
+          combined.services[service],
+          configuration,
+          `Phoenix must not alter ${service} with ${overlays.join(":") || "Pi only"}`,
+        );
+      }
+      assert.deepEqual(combined.services.phoenix, phoenix);
+      assert.deepEqual(combined.volumes, {
+        ...existing.volumes,
+        phoenix: selected.volumes.phoenix,
+      });
+    }
+  }
 
   // Use the normal preflight/start path, with a prebuilt Pi image.
   runCommand("make", ["-o", "build", "up"], options);

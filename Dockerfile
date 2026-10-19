@@ -29,6 +29,9 @@ RUN chmod 0755 /usr/local/bin/pi-box-entrypoint \
 
 # UTF-8 prevents tmux from replacing Unicode UI characters.
 ENV HOME=/home/node \
+    EDITOR=micro \
+    VISUAL=micro \
+    PAGER=bat \
     GIT_CONFIG_GLOBAL=/home/node/.config/git/config \
     LANG=C.UTF-8 \
     TERM=xterm-256color \

@@ -65,4 +65,33 @@ test("default Pi configuration never installs or enables observability", () => {
     example,
     /^# COMPOSE_FILE=compose.yaml:compose.postgres.yaml:compose.phoenix.yaml$/m,
   );
+  assert.match(
+    example,
+    /^# COMPOSE_FILE=compose.yaml:compose.browserless.yaml:compose.phoenix.yaml$/m,
+  );
+  assert.match(
+    example,
+    /^# COMPOSE_FILE=compose.yaml:compose.postgres.yaml:compose.browserless.yaml:compose.phoenix.yaml$/m,
+  );
+});
+
+test("Phoenix setup remains discoverable after the README rewrite", () => {
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+  assert.ok(readme.includes("[Phoenix guide](docs/phoenix.md)"));
+  assert.ok(readme.includes("[Browserless guide](docs/browserless.md)"));
+  const guide = readFileSync(
+    new URL("../docs/phoenix.md", import.meta.url),
+    "utf8",
+  );
+  const documentedSettings = JSON.parse(
+    guide.match(/```json\n([\s\S]+?)\n\s*```/)[1],
+  );
+  const testedSettings = JSON.parse(
+    readFileSync(
+      new URL("fixtures/phoenix/settings.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(documentedSettings, testedSettings);
+  assert.ok(guide.includes("pi install npm:pi-otel@0.3.0"));
 });

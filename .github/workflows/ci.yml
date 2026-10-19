@@ -54,6 +54,12 @@ jobs:
         with:
           node-version: '22'
 
+      # Runner-provided Compose can lag: start --wait requires Compose v5.0+.
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v2
+        with:
+          version: v5.6.0
+
       # Native runners, not QEMU. One builder shares common layers between targets.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -93,3 +99,7 @@ jobs:
 
       - name: Verify optional PostgreSQL
         run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/postgres-integration.mjs
+
+      # The acceptance test pulls the overlay's same multi-architecture digest.
+      - name: Verify optional Browserless Chromium
+        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/browserless-integration.mjs

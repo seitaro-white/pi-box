@@ -2,11 +2,12 @@
 
 Pi-box is a lightweight development container setup build around the [Pi](https://pi.dev) agent harness.
 
+Dev containers are are particularly useful for agentic software engineering because they:
 
-- Provide the PI agent harness with suitable development environment and appriate tools within a containerised sandbox (rather than running it directly on your local system)
-- Allows for remove development, with the container hosted on a home server or cloud VM and agentic work
+- Provide a enclosed sandbox environment that agents can operate in with much less risk of xyz
+- Facilitate the managing of long-running processes (i.e. agent workflows) that don't stop when you lose internet connection or close your laptop lid.
 
-Pi box is a (slightly trimmed down) version of what I am actually using for development - I've published it publicly both with the hope that others might use or adopt from it, but also as a demonstration (in lieu of a blog post) of how I'm working with agents/llm these days, what tools and patters Ni've found useful in my own work.
+This repo is a trimmed down version of the setup I am actively using for development - I've published it here both so anyone can use or adopt it, and as a demonstration (in lieu of a blog post) of how I'm working with agents/llm these days, and what tools and patters I've found useful in my own work.
 
 ## Contents
 
@@ -25,7 +26,7 @@ Pi box is a (slightly trimmed down) version of what I am actually using for deve
   - [Tailscale](#tailscale)
   - [Updating extensions](#updating-extensions)
 
-## Installation
+## Installation & Useage
 
 Pre-requisites: Docker (with Compose v5.0+), Node, Npm and Make.
 
@@ -37,18 +38,25 @@ cd pi-box
 docker compose up
 ```
 
-Go directly to shell with `docker compose exec pi-box bash` or (highly recommended) via tmux with `tmux attach-session -t shell`
+To get into the container and start working
+
+```bash
+docker compose exec pi-box bash
+pi
+```
+
+```bash
+tmux attach-session -t SESSION_NAME
+pi
+```
+
+There are also some convinience alias in Makefile. The environment is set up so that pi settings and git credentials are stored in persistent volumes and survive image rebuild.
 
 
-## Basic usage
+## Architecture
 
-Once in, you can use the container as you would normally use any development environment. The environment is set up so that pi settings and git credentials are stored in persistent volumes and survive image rebuild.
+Pi box includes a main dev container that contains Pi and basic dev tools, as well as a set of optional side containers. These are managed with Docker Compose
 
-
-
-## Architecture at a glance
-
-Pi Box is one development container, managed by Docker Compose. Pi and the development tools run together inside it; tmux keeps the interactive session alive when you disconnect. Optional services, such as PostgreSQL, run in separate containers on the Compose network.
 
 ```mermaid
 flowchart TD
@@ -76,7 +84,6 @@ flowchart TD
     class db,data optional
 ```
 
-[`compose.yaml`](compose.yaml) defines Pi Box and its three persistent volumes. Selecting [`compose.postgres.yaml`](compose.postgres.yaml) alongside it adds the database and Pi's connection settings; no database port is published to the host. SSH and Tailscale, if used, run on the host—not inside Pi Box.
 
 The development container runs as the non-root `node` user, with Linux capabilities dropped and no host home directory or Docker socket mounted. This reduces privileges, but is **not a complete agent sandbox**: Pi can still access its mounted files, credentials and outbound network.
 
@@ -90,10 +97,10 @@ Both image variants share the development tools. The **recommended** image adds 
 
 **Both variants:**
 
-- **Pi** — coding agent harness - model agnostic, minimal and easily extendable.
-- **tmux** - terminal multiplexer, for managing multiple terminal sessions and allowing background AI work.
-- **Standard development tools:** Bash, Git, tmux, ripgrep, fd,
-- **Tui navigation tools:** micro (tui file editor), bat (tui file pager), nnn (tui file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
+- **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
+- **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
+- **Standard development tools:** Bash, Git, ripgrep, fd,
+- **Tui navigation tools:** micro (file editor), bat (file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
 - **Python, uv and ruff**
 - **Node.js, npm and biome**
@@ -113,23 +120,6 @@ Both image variants share the development tools. The **recommended** image adds 
 While I do have a set of development skills I use frequently, I'm of the opinion that skills a) specific to the nature/requirements of individual projects & codebases, and b) are something best written yourself (or as part of a team) based on your requirements and experience of coding, so I've left them out.
 
 
-
-<!-- Add any personal rationale here. Exact npm pins live in container/package.json. -->
-
-### Containers
-
-| Service | Default container name | Enabled by default? | Role / storage |
-| --- | --- | --- | --- |
-| `pi-box` | `pi-box-main-container` | Yes | Development environment; persistent workspace, Pi state and Git configuration volumes. |
-| `postgres` | `pi-box-postgres-container` | No | Optional PostgreSQL 15 database; its own persistent data volume. Enabled through `compose.postgres.yaml`. |
-
-Use service names with `docker compose`, e.g. `docker compose exec pi-box bash`. The `pi` command inside the container starts the agent. The development container name can be overridden with `CONTAINER`; the database container name follows `<project>-postgres-container` (the default project is `pi-box`).
-
-<!-- Add future optional services here when implemented. -->
-
-### What's not included
-
-<!-- Note deliberate omissions and anything users need to provide themselves. -->
 
 ## Advanced setup and technical details
 

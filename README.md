@@ -231,6 +231,105 @@ container/volume settings, with its own private `.env` and password.
 This is a minimal local development service—not a production database setup or
 an automatic backup, upgrade or password-management system.
 
+## Optional Browserless Chromium — trusted development only
+
+Choose one selection in private `.env`, then run `chmod 600 .env` and `make up`:
+
+```dotenv
+# Pi + Browserless Chromium
+COMPOSE_FILE=compose.yaml:compose.browserless.yaml
+BROWSER_TOKEN='your-own-strong-private-token'
+
+# Or Pi + PostgreSQL + Browserless Chromium:
+# COMPOSE_FILE=compose.yaml:compose.postgres.yaml:compose.browserless.yaml
+# Also configure POSTGRES_PASSWORD and BROWSER_TOKEN privately.
+```
+
+[`compose.browserless.yaml`](compose.browserless.yaml) pulls upstream Chromium
+**v2.57.1**, pinned to its AMD64/ARM64 manifest digest. Neither Pi image installs
+browser clients or browser packages. Upgrade the version/digest deliberately and
+rerun acceptance; there is no project-owned browser image to build.
+
+**License:** Browserless is [SSPL/commercial dual-licensed](https://github.com/browserless/browserless/blob/v2.57.1/LICENSE).
+Its notice requires a commercial license for commercial applications and
+closed-source CI. Confirm your own use is permitted; this project's intended
+SSPL use was approved for adoption.
+
+**Security:** the verified upstream launcher uses `--no-sandbox`;
+`chrome://sandbox` reports no Chromium sandbox. This trade-off was explicitly
+approved for trusted development. The non-root `blessuser` container uses init,
+`no-new-privileges` and 2 GiB shared memory, without privileged mode, added
+capabilities or unconfined policies. It has no published ports or mounts, but
+has outbound networking and can reach Pi and other services. This is **not a
+multi-tenant security boundary**. Keep tokens private: Docker administrators and
+`docker compose config` can reveal them. Never log authenticated URLs.
+
+Install your own client in a project inside Pi (`npm install playwright-core@1.64.1`).
+This JavaScript example saves client-side artifacts in Pi's `/workspace`:
+
+```javascript
+import { chromium } from 'playwright-core';
+
+const url = new URL(process.env.BROWSER_CDP_URL);
+url.searchParams.set('token', process.env.BROWSER_TOKEN);
+const browser = await chromium.connectOverCDP(url.href);
+try {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.setContent('<button onclick="this.textContent=\'clicked\'">Click</button>');
+    await page.getByRole('button').click();
+    await page.screenshot({ path: '/workspace/page.png' });
+    await page.pdf({ path: '/workspace/page.pdf' });
+  } finally {
+    await context.close();
+  }
+} finally {
+  await browser.close();
+}
+```
+
+CDP `browser.close()` disconnects the client; Browserless normally disposes the
+session after disconnect. The upstream default session timeout is **30 seconds**
+(concurrency 10, queue 10). No persistence across connections is promised; close
+owned contexts and disconnect promptly. Acceptance verifies a fresh connection.
+
+Browser `localhost` is the **browser container**, not Pi. Serve Pi applications
+on `0.0.0.0` and visit `http://pi:PORT`. Pi files are not browser-side `file://`
+files: serve them over HTTP or use `page.setContent()`. Client-saved artifacts
+live in Pi, not the browser container.
+
+A manual attach/navigation/cleanup check passed with **Stagehand 3.7.3** in a
+disposable project (not an existing application), using this API:
+
+```javascript
+import { Stagehand } from '@browserbasehq/stagehand';
+const url = new URL(process.env.BROWSER_CDP_URL);
+url.searchParams.set('token', process.env.BROWSER_TOKEN);
+const stagehand = new Stagehand({
+  env: 'LOCAL', verbose: 0, disablePino: true,
+  localBrowserLaunchOptions: { cdpUrl: url.href },
+});
+try {
+  await stagehand.init();
+  const page = await stagehand.context.newPage();
+  await page.goto('data:text/html,<title>stagehand-check</title>');
+  console.log(await page.title());
+} finally {
+  await stagehand.close();
+}
+```
+
+Only attach/navigation/cleanup were checked, without model credentials or calls.
+AI actions need separate model access. Stagehand 4 has a different API and is
+not covered by this example. Stagehand is not an acceptance-test dependency.
+
+Enabling the overlay may recreate Pi and end active sessions. To deselect it,
+first run `docker compose stop browser` while it is still selected, then remove
+the overlay from `.env` and run `make up`. `make replace` remains Pi-only.
+See [upstream configuration docs](https://docs.browserless.io/enterprise/open-source)
+for further options. GUI/browser-UI forwarding is separate and not included.
+
 ## Git setup and private repositories
 
 Inside the container, configure your identity once:
@@ -369,8 +468,10 @@ npm run test:integration
 ```
 
 This runs host tests, both image smoke suites, Compose acceptance and the focused
-PostgreSQL integration test. It uses prebuilt Pi images, pulls the pinned database
-image if needed, and uses disposable storage/credentials—not your running setup.
+PostgreSQL and Browserless integration tests. It uses prebuilt Pi images, pulls
+pinned sidecar images if needed, and uses disposable storage/credentials—not your
+running setup. The Browserless test installs a lockfile-pinned client only in
+disposable Pi.
 For different image tags:
 
 ```bash
@@ -387,7 +488,8 @@ Test organization:
 - `tests/compose.mjs`: real Make/Compose startup, idempotency, forced replacement, refusal guards, and persistent storage across full teardown/recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/compose.mjs`.
 - `tests/compose-configuration.test.mjs`: native Compose overrides and private local configuration.
 - `tests/postgres-integration.mjs`: automatic `.env` file selection/overrides, PostgreSQL on/off selection, authenticated SQL/CRUD from Pi with one administrator login, no published DB port, and persistent data after recreation. Run separately with `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/postgres-integration.mjs`.
-- `tests/integration.mjs`: host tests, both image suites, then Compose and PostgreSQL acceptance (Docker only).
+- `tests/browserless-integration.mjs`: optional/combined Compose selection, private browser health/settings, missing-token rejection, DOM interaction, PNG/PDF and fresh-session cleanup. Run separately with `node tests/browserless-integration.mjs`.
+- `tests/integration.mjs`: host tests, both image suites, then Compose, PostgreSQL and Browserless acceptance (Docker only).
 
 The smoke suite checks startup, shared tool availability (including version checks for nano, micro, nnn, bat, ripgrep and fd in both variants), pinned package presence/absence, extension registration (including `/usage` and `/lsp`), Ruff/Biome presence in recommended and absence from base, real LSP diagnostics and CLI formatting on synthetic Python/JavaScript files, image user/permissions and workspace/agent/Git storage (using synthetic credentials) across restart and replacement. Variant reconciliation is covered by the fast host tests, not a separate integration suite. Terminal, Unicode and interactive-session tests are not included. Set `PI_BOX_IMAGE` when running a single smoke suite. The root `package.json` contains only development commands; image dependencies remain in `container/package.json`.
 

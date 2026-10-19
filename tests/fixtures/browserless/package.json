@@ -1,0 +1,8 @@
+{
+  "name": "pi-box-browserless-acceptance",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "1.64.1"
+  }
+}

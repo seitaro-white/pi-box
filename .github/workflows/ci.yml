@@ -93,3 +93,7 @@ jobs:
 
       - name: Verify optional PostgreSQL
         run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/postgres-integration.mjs
+
+      # The acceptance test pulls the overlay's same multi-architecture digest.
+      - name: Verify optional Browserless Chromium
+        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/browserless-integration.mjs

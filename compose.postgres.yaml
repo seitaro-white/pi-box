@@ -1,18 +1,20 @@
 # Select with COMPOSE_FILE=compose.yaml:compose.postgres.yaml in your local .env.
 # No server, DB volume or credentials are added by the base compose.yaml alone.
 services:
-  pi:
+  pi-box:
     environment:
-      PGHOST: db
+      PGHOST: postgres
       PGPORT: "5432"
       PGDATABASE: appdb
       PGUSER: postgres
       PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your private .env}
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
 
-  db:
+  postgres:
+    # Keep the name descriptive and scoped to the Compose project.
+    container_name: ${COMPOSE_PROJECT_NAME:-pi-box}-postgres-container
     # PostgreSQL 15 matches Debian Bookworm's client; pin the multi-arch image.
     image: docker.io/library/postgres:15-bookworm@sha256:d4a8e1f88f475ee3e0137fa89d21ebc59f6c6ab16bf369ee92907607cc3455ae
     security_opt:

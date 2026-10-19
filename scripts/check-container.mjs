@@ -18,7 +18,7 @@ function docker(args, options = {}) {
 /** Read the same resolved configuration that Compose will actually use. */
 function configuration() {
   const config = JSON.parse(docker(["compose", "config", "--format", "json"]));
-  const service = config.services.pi;
+  const service = config.services["pi-box"];
   const paths = [
     "/workspace",
     "/home/node/.pi/agent",
@@ -60,6 +60,28 @@ function configuration() {
 /** Refuse any replacement unless persistent mounts and disposable files are safe. */
 export function checkContainer() {
   const { project, container, image, volumes } = configuration();
+  // Renamed services are orphans to Compose. Refuse even stopped legacy
+  // containers so an old database cannot later restart against shared storage.
+  for (const service of ["pi", "db"]) {
+    const legacy = docker([
+      "container",
+      "ls",
+      "--all",
+      "--filter",
+      `label=com.docker.compose.project=${project}`,
+      "--filter",
+      `label=com.docker.compose.service=${service}`,
+      "--filter",
+      "label=com.docker.compose.config-hash",
+      "--format",
+      "{{.Names}}",
+    ]);
+    if (legacy) {
+      throw new Error(
+        `Legacy Compose service ${service} found: ${legacy}. Follow the service-name migration in README.md before starting the renamed services. No containers or volumes were changed.`,
+      );
+    }
+  }
   const [metadata] = JSON.parse(docker(["image", "inspect", image]));
   if (
     !metadata.Config.Env?.includes(
@@ -79,7 +101,7 @@ export function checkContainer() {
     "--filter",
     `label=com.docker.compose.project=${project}`,
     "--filter",
-    "label=com.docker.compose.service=pi",
+    "label=com.docker.compose.service=pi-box",
     "--filter",
     "label=com.docker.compose.config-hash",
     "--format",
@@ -107,7 +129,7 @@ export function checkContainer() {
     if (
       !labels["com.docker.compose.config-hash"] ||
       labels["com.docker.compose.project"] !== project ||
-      labels["com.docker.compose.service"] !== "pi"
+      labels["com.docker.compose.service"] !== "pi-box"
     ) {
       throw new Error(
         `${container} is not managed by this Compose project/service. Handle it manually; refusing replacement.`,

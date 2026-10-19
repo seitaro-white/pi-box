@@ -57,6 +57,25 @@ console.log(JSON.stringify({ composeFiles: process.env.COMPOSE_FILE || null, ima
   });
 }
 
+test("Compose uses descriptive service names without changing persistent storage", () => {
+  const base = readFileSync("compose.yaml", "utf8");
+  const postgres = readFileSync("compose.postgres.yaml", "utf8");
+  const services = (contents) =>
+    [...contents.split(/^volumes:/m)[0].matchAll(/^  ([\w-]+):$/gm)]
+      .map((match) => match[1]);
+  assert.deepEqual(services(base), ["pi-box"]);
+  assert.deepEqual(services(postgres), ["pi-box", "postgres"]);
+  assert.match(base, /container_name: \$\{CONTAINER:-pi-box-main-container\}/);
+  assert.ok(postgres.includes("container_name: ${COMPOSE_PROJECT_NAME:-pi-box}-postgres-container"));
+  for (const name of ["workspace", "agent", "git"]) {
+    assert.ok(base.includes(`:-pi-box-${name}}`), `retain ${name} volume name`);
+  }
+  assert.match(postgres, /PGHOST: postgres/);
+  assert.match(postgres, /depends_on:\n      postgres:\n        condition: service_healthy/);
+  assert.match(postgres, /- postgres:\/var\/lib\/postgresql\/data/);
+  assert.match(postgres, /^  postgres: \{\}$/m);
+});
+
 test("local configuration is Git-ignored and excluded from image context", () => {
   const gitIgnoreResult = spawnSync("git", ["check-ignore", ".env"], {
     encoding: "utf8",

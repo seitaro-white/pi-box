@@ -1,12 +1,12 @@
 name: pi-box
 
 services:
-  pi:
+  pi-box:
     image: ${IMAGE:-pi-box:0.2.0}
     build:
       context: .
       target: ${TARGET:-recommended}
-    container_name: ${CONTAINER:-pi-box-dev}
+    container_name: ${CONTAINER:-pi-box-main-container}
     cap_drop:
       - ALL
     security_opt:

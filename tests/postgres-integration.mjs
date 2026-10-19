@@ -74,12 +74,12 @@ const runMakeTarget = (targetName) =>
 const inspectContainer = (containerId) =>
   JSON.parse(runDockerCommand(["inspect", containerId]))[0];
 const getPostgresContainerId = () =>
-  runComposeCommand(["ps", "--all", "--quiet", "db"]);
+  runComposeCommand(["ps", "--all", "--quiet", "postgres"]);
 const executeSqlInPiContainer = (sqlQuery) =>
   runComposeCommand([
     "exec",
     "-T",
-    "pi",
+    "pi-box",
     "psql",
     "-X",
     "-v",
@@ -94,17 +94,22 @@ try {
   );
   assert.equal(resolvedComposeConfiguration.name, testProjectName);
   assert.equal(
-    resolvedComposeConfiguration.services.pi.image,
+    resolvedComposeConfiguration.services["pi-box"].image,
     localComposeSettings.IMAGE,
   );
-  assert.equal(resolvedComposeConfiguration.services.db.ports, undefined);
   assert.equal(
-    resolvedComposeConfiguration.services.pi.environment.POSTGRES_PASSWORD,
+    resolvedComposeConfiguration.services.postgres.container_name,
+    `${testProjectName}-postgres-container`,
+    "database container name stays scoped to the selected Compose project",
+  );
+  assert.equal(resolvedComposeConfiguration.services.postgres.ports, undefined);
+  assert.equal(
+    resolvedComposeConfiguration.services["pi-box"].environment.POSTGRES_PASSWORD,
     undefined,
   );
   assert.equal(
-    resolvedComposeConfiguration.services.pi.environment.PGPASSWORD,
-    resolvedComposeConfiguration.services.db.environment.POSTGRES_PASSWORD,
+    resolvedComposeConfiguration.services["pi-box"].environment.PGPASSWORD,
+    resolvedComposeConfiguration.services.postgres.environment.POSTGRES_PASSWORD,
     "Pi and PostgreSQL use one manually configured password",
   );
   runMakeTarget("up");
@@ -142,7 +147,7 @@ try {
       "compose",
       "exec",
       "-T",
-      "pi",
+      "pi-box",
       "env",
       "PGPASSWORD=SYNTHETIC_WRONG_PASSWORD",
       "psql",
@@ -183,7 +188,7 @@ try {
     "--wait",
     "--wait-timeout",
     "60",
-    "db",
+    "postgres",
   ]);
   assert.notEqual(getPostgresContainerId(), originalPostgresContainerId);
   assert.equal(
@@ -199,7 +204,7 @@ try {
     environmentFilePath,
     "utf8",
   );
-  runComposeCommand(["stop", "db"]);
+  runComposeCommand(["stop", "postgres"]);
   writeFileSync(
     environmentFilePath,
     databaseEnabledConfiguration.replace(
@@ -211,7 +216,7 @@ try {
   const piOnlyConfiguration = JSON.parse(
     runComposeCommand(["config", "--format", "json"]),
   );
-  assert.deepEqual(Object.keys(piOnlyConfiguration.services), ["pi"]);
+  assert.deepEqual(Object.keys(piOnlyConfiguration.services), ["pi-box"]);
   assert.equal(
     inspectContainer(testProjectName).Config.Env.some((value) =>
       value.startsWith("PGPASSWORD="),

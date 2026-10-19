@@ -33,7 +33,7 @@ Inside tmux, run `pi` from `/workspace` or your project directory.
 running, don't start a second instance. For VS Code, use **Dev Containers:
 Attach to Running Container…**.
 
-By default, Compose starts only `pi`, using [`compose.yaml`](compose.yaml).
+By default, Compose starts only the `pi-box` service, using [`compose.yaml`](compose.yaml).
 PostgreSQL is opt-in through your local `.env` (see below). Neither setup
 publishes database ports. `make up` starts all selected services, waits for
 readiness and does not launch Pi automatically. An unchanged `up` keeps existing sessions; a changed image or
@@ -45,8 +45,8 @@ Other useful commands:
 make build                  # Build only; don't touch the container
 make check                  # Read-only preflight; requires the built image
 make replace                # Preflight, then force recreation using the built image
-docker compose logs pi      # View logs
-docker compose exec pi bash # Open a separate shell (not tmux)
+docker compose logs pi-box      # View logs
+docker compose exec pi-box bash # Open a separate shell (not tmux)
 ```
 
 The Makefile is a thin wrapper: Compose owns builds, networking, startup,
@@ -54,6 +54,69 @@ recreation and health waiting. `scripts/check-container.mjs` adds only the
 read-only storage and replacement checks. **Use Make for startup/replacement:**
 direct `docker compose up` bypasses those checks. Don't run lifecycle commands
 concurrently.
+
+### Service names
+
+| Compose service | Default container name | Role |
+| --- | --- | --- |
+| `pi-box` | `pi-box-main-container` (override with `CONTAINER`) | Development environment running Pi and tmux. |
+| `postgres` | `pi-box-postgres-container` (`<project>-postgres-container`) | Optional PostgreSQL server. |
+
+Use service names with `docker compose` and container names with `docker exec`.
+The `pi` command inside the development container still starts the agent.
+For example, `docker compose exec pi-box bash` and
+`docker exec -it pi-box-main-container bash` both open a shell with the default names.
+The database container prefix follows the Compose project name, keeping independent
+projects' database names distinct.
+
+### Service-name migration for existing installs
+
+The old services `pi` and `db` are now `pi-box` and `postgres`, and the development
+container is now `pi-box-main-container` rather than `pi-box-dev`. Volume names and
+mount paths are unchanged, but Compose cannot adopt containers under new service
+names. Preflight refuses both running and stopped legacy containers, or a
+differently named development container, rather than deleting anything automatically.
+
+Before upgrading an existing setup, finish running work, back up important data,
+and copy out any needed files outside the persistent mounts. While still using
+the old checkout/configuration, run `make check` with the development container
+running to check for non-persistent Git/SSH files.
+
+After updating, inspect the old containers (adjust the project name if customised):
+
+```bash
+docker ps -a --filter label=com.docker.compose.project=pi-box \
+  --format '{{.Names}}\t{{.Label "com.docker.compose.service"}}'
+```
+
+Stop and remove only the containers labelled with the old `pi` or `db` service.
+If you already adopted the `pi-box` service name but still use the old
+`pi-box-dev` container name, remove that old development container too.
+For the old default development container:
+
+```bash
+docker stop pi-box-dev
+docker rm pi-box-dev
+```
+
+If the old optional database exists, stop and remove it too before starting the
+renamed services (its original default name was `pi-box-db-1`):
+
+```bash
+docker stop pi-box-db-1
+docker rm pi-box-db-1
+```
+
+Use your actual container names if different. If the database service was already
+renamed to `postgres`, Compose will recreate its old `pi-box-postgres-1` container
+under the new `pi-box-postgres-container` name during `make up`, retaining its data
+volume but ending active database connections.
+
+These removals end sessions and
+discard container-local files, but retain named volumes. **Do not remove volumes
+or use `down -v`.** Keep your existing `.env` and database password, then run
+`make up` to recreate services using the same stored data. Update any external
+scripts or application connection strings from `db:5432` to `postgres:5432`.
 
 ### Storage and replacement safeguards
 
@@ -77,7 +140,7 @@ can be lost, and root's home is not inspected. Extra/bind mounts, differently
 named existing services and foreign Compose projects require manual handling.
 
 A stopped existing container must be started before its files can be inspected:
-use `docker compose start --wait pi`. This does not replace it.
+use `docker compose start --wait pi-box`. This does not replace it.
 
 **Never use `docker compose down -v` on storage you want to keep.** It deletes
 Compose-managed volumes. Ordinary `down` retains volumes but ends sessions.
@@ -174,7 +237,7 @@ Inside Pi Box, Pi or your application can use:
 psql -c 'SELECT current_user, current_database();'
 ```
 
-The connection is **`db:5432`, database `appdb`, login `postgres`**. Standard libpq
+The connection is **`postgres:5432`, database `appdb`, login `postgres`**. Standard libpq
 variables (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`) are set in
 Pi's environment; libraries that use a connection URL must be configured by
 your application without committing its password. `localhost` inside Pi is
@@ -210,7 +273,7 @@ or change the server's major version without a PostgreSQL data migration.
 To stop the database without deleting its data:
 
 ```bash
-docker compose stop db
+docker compose stop postgres
 ```
 
 Run that while the PostgreSQL overlay is still selected. To return Pi to its
@@ -222,7 +285,7 @@ previously running service or delete its data. The password may remain in
 Direct Compose commands use the same local selection automatically:
 
 ```bash
-docker compose logs db
+docker compose logs postgres
 ```
 
 For an independent instance, use a different Compose project name and Pi

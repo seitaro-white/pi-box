@@ -1,0 +1,12 @@
+{
+  "otel": {
+    "enabled": true,
+    "endpoint": "http://phoenix:6006",
+    "protocol": "http/protobuf",
+    "serviceName": "pi",
+    "spanNaming": "genai",
+    "captureContent": "full",
+    "propagateToShell": false,
+    "signals": { "traces": true, "metrics": false, "logs": false }
+  }
+}

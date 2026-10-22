@@ -13,7 +13,7 @@ export default function (pi) {
         name: "Fixture model",
         reasoning: false,
         input: ["text"],
-        cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: 32000,
         maxTokens: 1000,
       },
@@ -35,44 +35,25 @@ export default function (pi) {
           stopReason: "pending",
           content: [],
           usage: {
-            input: 17,
-            output: 5,
+            input: 1,
+            output: 1,
             cacheRead: 0,
             cacheWrite: 0,
-            totalTokens: 22,
-            cost: {
-              input: 0.000017,
-              output: 0.00001,
-              cacheRead: 0,
-              cacheWrite: 0,
-              total: 0.000027,
-            },
+            totalTokens: 2,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
           },
         };
         stream.push({ type: "start", partial: message });
         if (first) {
-          for (const [i, path] of [
-            "/fixture/marker.txt",
-            "/fixture/does-not-exist.txt",
-          ].entries()) {
-            message.content.push({
-              type: "toolCall",
-              id: `fixture-read-${i}`,
-              name: "read",
-              arguments: { path },
-            });
-            stream.push({
-              type: "toolcall_start",
-              contentIndex: i,
-              partial: message,
-            });
-            stream.push({
-              type: "toolcall_end",
-              contentIndex: i,
-              toolCall: message.content[i],
-              partial: message,
-            });
-          }
+          const toolCall = {
+            type: "toolCall",
+            id: "fixture-read",
+            name: "read",
+            arguments: { path: "/fixture/marker.txt" },
+          };
+          message.content.push(toolCall);
+          stream.push({ type: "toolcall_start", contentIndex: 0, partial: message });
+          stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
         } else {
           message.content.push({
             type: "text",

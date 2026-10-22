@@ -1,4 +1,4 @@
-// Seed only synthetic workspace, history and Git credentials in the disposable image.
+// Seed only synthetic workspace, history, auth and Git credentials in the test image.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -17,6 +17,11 @@ writeFileSync(`${cwd}/unpushed.txt`, "SYNTHETIC_WORKSPACE_CANARY\n", {
 writeFileSync("/home/node/.pi/agent/history-canary", "SYNTHETIC_HISTORY_CANARY", {
   mode: 0o600,
 });
+writeFileSync(
+  "/home/node/.pi/agent/auth.json",
+  JSON.stringify({ synthetic: "SYNTHETIC_AUTH_CANARY_NOT_A_REAL_TOKEN" }),
+  { mode: 0o600 },
+);
 execFileSync("git", ["config", "--global", "user.email", "synthetic@example.invalid"]);
 execFileSync("git", ["credential", "approve"], {
   input:

@@ -16,7 +16,7 @@ const operatorPackage = {
 const policyFiles = [
   "web-search.json",
   "extensions/subagent/config.json",
-  "plannotator.json",
+  "extensions/operator-extension/config.json",
   "pi-lsp.json",
 ];
 
@@ -140,24 +140,21 @@ describe("agent initialization", () => {
     ]);
   });
 
-  it("migrates legacy volumes without an ownership file", (t) => {
+  it("preserves unowned image paths when no ownership file exists", (t) => {
     const state = agentState(t);
-    const unrelated = "/opt/pi/node_modules/operator-extension";
-    state.writeJson("settings.json", {
-      packages: [
-        { source: "/opt/pi/node_modules/pi-subagents", prompts: [] },
-        "/opt/pi/node_modules/pi-web-access",
-        operatorPackage,
-        unrelated,
-      ],
-    });
+    const packages = [
+      { source: "/opt/pi/node_modules/operator-extension", prompts: [] },
+      operatorPackage,
+    ];
+    state.writeJson("settings.json", { packages });
 
     state.run("base");
 
-    assert.deepEqual(state.json("settings.json").packages, [
-      operatorPackage,
-      unrelated,
-    ]);
+    assert.deepEqual(state.json("settings.json").packages, packages);
+    assert.deepEqual(state.json("pi-box-packages.json"), {
+      version: 1,
+      packages: [],
+    });
   });
 
   it("refuses broken settings or ownership without overwriting either file", (t) => {

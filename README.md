@@ -201,3 +201,11 @@ Bundled Pi and extension versions are pinned in [`container/package.json`](conta
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 
 Rebuilds retain persistent Pi settings, credentials and user-installed packages. Image-managed extension registrations are reconciled at startup; rebuilding does not reset your personal configuration.
+
+Very old installations using Compose services named `pi`/`db` must be stopped and migrated manually before starting the current services. Volumes predating `pi-box-packages.json` ownership tracking may need obsolete image-package registrations removed manually; startup no longer guesses which existing registrations it owns.
+
+## Testing
+
+`npm test` runs the small Docker-free suite for state preservation, replacement guards and runtime-manifest consistency. `npm run test:integration` runs disposable Docker acceptance against prebuilt base, recommended and sandbox images, including Compose persistence, PostgreSQL and Browserless. Phoenix and live sandbox checks are explicitly opt-in.
+
+See [the test guide](tests/README.md) for image-build commands, suite selection and cleanup behaviour. CI uses the same acceptance runner on AMD64 and ARM64.

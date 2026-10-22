@@ -1,11 +1,11 @@
-// Run on stdin after restart and replacement of the disposable smoke container.
+// Run on stdin after restart and replacement of the disposable Compose container.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { test } from "node:test";
 
 test(
-  `${process.env.STORAGE_TRANSITION}: workspace and private agent state persist`,
+  "workspace and private agent state persist",
   () => {
     assert.equal(
       readFileSync("/workspace/repo/unpushed.txt", "utf8"),
@@ -22,7 +22,9 @@ test(
       "SYNTHETIC_HISTORY_CANARY",
     );
     const auth = "/home/node/.pi/agent/auth.json";
-    assert.deepEqual(JSON.parse(readFileSync(auth, "utf8")), {});
+    assert.deepEqual(JSON.parse(readFileSync(auth, "utf8")), {
+      synthetic: "SYNTHETIC_AUTH_CANARY_NOT_A_REAL_TOKEN",
+    });
     assert.equal(statSync(auth).mode & 0o777, 0o600);
     assert.equal(
       execFileSync("git", ["config", "--global", "user.email"], {

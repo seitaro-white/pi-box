@@ -32,7 +32,7 @@ console.log(JSON.stringify({ composeFiles: process.env.COMPOSE_FILE || null, ima
     delete stubEnvironment.IMAGE;
     const makeArguments = [
       "-s",
-      "attach",
+      "build",
       ...(explicitOverrides
         ? [
             "COMPOSE_FILE=compose.yaml:compose.postgres.yaml",

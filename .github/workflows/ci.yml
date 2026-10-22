@@ -94,6 +94,22 @@ jobs:
       - name: Smoke-test recommended image
         run: PI_BOX_PROFILE=recommended PI_BOX_IMAGE=pi-box:ci-recommended node tests/smoke.mjs
 
+      # .dockerignore restricts build inputs; no sbx, KVM, or login required.
+      - name: Build sandbox image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: sandbox/pi-box.dockerfile
+          platforms: linux/${{ matrix.arch }}
+          tags: pi-box:ci-sandbox
+          load: true
+          push: false
+          cache-from: type=gha,scope=pi-box-${{ matrix.arch }}-sandbox
+          cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-sandbox,mode=max
+
+      - name: Smoke-test sandbox image without sbx
+        run: node tests/sandbox-image.mjs
+
       - name: Verify Compose lifecycle and persistence
         run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/compose.mjs
 

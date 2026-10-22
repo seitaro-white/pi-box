@@ -1,0 +1,9 @@
+schemaVersion: "1"
+name: pi-sandbox
+# For a local kit, sbx requires agent to match the checkout directory name.
+agent: pi-box-public
+kits:
+  - .
+# Omitting workspace means no host directory is mounted.
+sandboxOptions:
+  skills: off

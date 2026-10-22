@@ -154,20 +154,16 @@ if (args[0] === "compose") {
   });
 }
 
-test("Make checks before Compose up/replace and uses Compose for attachment", () => {
-  for (const target of ["up", "replace", "attach"]) {
+test("Make checks before Compose up/replace", () => {
+  for (const target of ["up", "replace"]) {
     const result = spawnSync("make", ["-n", target], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     const lines = result.stdout.split("\n");
     const up = lines.findIndex((line) => line.startsWith("docker compose up "));
-    if (target === "attach") {
-      assert.match(result.stdout, /docker compose exec pi-box tmux attach-session/);
-    } else {
-      const check = lines.indexOf("node scripts/check-container.mjs");
-      assert.ok(check >= 0 && check < up, result.stdout);
-      assert.match(lines[up], /--no-build --pull (never|missing)/);
-      if (target === "replace")
-        assert.match(lines[up], /--no-deps --force-recreate/);
-    }
+    const check = lines.indexOf("node scripts/check-container.mjs");
+    assert.ok(check >= 0 && check < up, result.stdout);
+    assert.match(lines[up], /--no-build --pull (never|missing)/);
+    if (target === "replace")
+      assert.match(lines[up], /--no-deps --force-recreate/);
   }
 });

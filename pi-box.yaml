@@ -1,0 +1,16 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: workload
+dockerfile: sandbox/pi-box.dockerfile
+displayName: Pi Box
+description: Persistent mountless Pi development environment with in-sandbox Codex login
+capabilities:
+  - type: com.docker.sandbox/sbx@1
+  - type: com.docker.sandbox/long-running@1
+  - type: com.docker.sandbox/resources@1
+    config:
+      cpu: 4
+      memory: 4g
+  # Outbound networking follows the host's allow-all policy; no project allowlist.
+  # No model credential capability: Pi /login owns its persistent auth.json.
+  # GitHub proxy authentication uses the host's sbx GitHub secret.

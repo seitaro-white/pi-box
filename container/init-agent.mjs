@@ -1,16 +1,17 @@
 // Seed non-secret defaults without clobbering model preferences, auth, history,
 // or operator-owned extension configuration in fresh or existing volumes.
+import { randomUUID } from "node:crypto";
 import {
-  readFileSync,
-  writeFileSync,
   mkdirSync,
+  readFileSync,
   renameSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 
-const dir = process.env.PI_CODING_AGENT_DIR || "/home/node/.pi/agent";
+const dir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
 const defaults = process.env.PI_BOX_DEFAULTS_DIR
   ? join(process.env.PI_BOX_DEFAULTS_DIR, "settings.json")
   : new URL("./defaults/settings.json", import.meta.url);

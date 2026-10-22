@@ -1,6 +1,7 @@
 # syntax=docker/sandbox-kit:3
 schemaVersion: "3"
 kind: workload
+dockerfile: sandbox/pi-box.dockerfile
 displayName: Pi Box
 description: Persistent mountless Pi development environment with in-sandbox Codex login
 capabilities:
@@ -12,5 +13,4 @@ capabilities:
       memory: 4g
   # Outbound networking follows the host's allow-all policy; no project allowlist.
   # No model credential capability: Pi /login owns its persistent auth.json.
-  # GitHub proxy credentials come from sbx's built-in shell identity. The
-  # compatibility creation path must not redeclare that service.
+  # GitHub proxy authentication uses the host's sbx GitHub secret.

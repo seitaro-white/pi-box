@@ -1,4 +1,4 @@
-.PHONY: build check replace up versions sandbox-create sandbox-start sandbox-shell sandbox-status sandbox-stop sandbox-validate
+.PHONY: build check replace up versions
 
 # Compose reads file selection, image/storage overrides and credentials from .env.
 # No local configuration is required for the default Pi-only setup.
@@ -6,11 +6,6 @@
 # Build from committed dependency inputs; Docker derives the runtime files.
 build:
 	docker compose build pi-box
-
-# Sandbox commands are intentionally separate while Compose remains supported.
-# No .env loading, implicit host mounts, recreation, pruning, or deletion.
-sandbox-create sandbox-start sandbox-shell sandbox-status sandbox-stop sandbox-validate:
-	node scripts/sandbox.mjs $(patsubst sandbox-%,%,$@)
 
 versions:
 	node scripts/check-versions.mjs

@@ -17,9 +17,12 @@ engine.run([
     pi --version
     python3 --version
     uv --version
+    test "$(uv python dir)" = "$HOME/.local/share/uv/python"
+    test "$(uv tool dir)" = "$HOME/.local/share/uv/tools"
+    test "$(uv tool dir --bin)" = "$HOME/.local/bin"
     ruff --version
     biome --version
-    node -e 'const s=require(process.env.PI_CODING_AGENT_DIR+"/settings.json"); if(s.packages.length !== 4) process.exit(1)'
+    node -e 'const s=require(require("node:os").homedir()+"/.pi/agent/settings.json"); if(s.packages.length !== 4) process.exit(1)'
     printf '{"synthetic":"not-a-real-token"}' > ~/.pi/agent/auth.json
     node /opt/pi/init-agent.mjs
     test "$(cat ~/.pi/agent/auth.json)" = '{"synthetic":"not-a-real-token"}'

@@ -12,6 +12,8 @@ workspaces/
 .env
 .env.*
 !.env.example
+# Optional machine-specific sbx workspace/state sharing configuration.
+sbxenv.local.yaml
 *.log
 .DS_Store
 node_modules/

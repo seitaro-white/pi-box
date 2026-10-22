@@ -1,91 +1,141 @@
-# Docker Sandboxes (initial macOS workflow)
+# Docker Sandboxes
 
-This is an opt-in replacement runtime alongside the existing Compose workflow.
-`make up` and existing CI still use Compose. Nothing here imports
-or deletes existing Docker volumes.
+Optional micro-VM runtime alongside Compose. `make up` remains Compose-based;
+there is no custom sandbox lifecycle script or Make wrapper. Use sbx's native
+**experimental** environment-file commands (tested with sbx v0.49.2 on Apple
+Silicon macOS). Compose remains the primary development workflow, with reusable
+named volumes. The sandbox is an optional isolation-first alternative.
 
-Tested with **sbx v0.49.2 on Apple Silicon macOS**. Local `sbx` does not require
-Docker Desktop. It builds the environment inside its own managed builder and
-runs Pi inside a micro-VM. This is stronger isolation, not protection against
-malicious changes to repositories or disclosure of credentials kept inside it.
+**Storage:** the default sandbox retains files across stop/start, but deleting it
+deletes its internal repositories and login. Local sbx v0.49.2 does not support
+reattachable named volumes (`sbx volume` is cloud-only). For storage independent
+of the sandbox, see [optional shared storage](#optional-shared-storage).
 
-## Host prerequisites
+## Quick reference
 
-Install and sign in interactively:
+Run from this checkout after the [one-time host setup](#one-time-host-setup):
+
+```bash
+# Preview what will be created; no changes made.
+sbx env plan ./sbxenv.yaml
+
+# First time: build the image and create the persistent, mountless sandbox.
+sbx env create ./sbxenv.yaml
+
+# Start/rejoin a plain shell. Start Pi or tmux yourself inside it.
+sbx env exec -it ./sbxenv.yaml -- bash -l
+# Inside the sandbox: cd ~/workspace; clone your repo; run pi.
+# First Pi session: /login → OpenAI/Codex.
+
+# Alternatively, start in the background without entering a shell.
+sbx env run --detach ./sbxenv.yaml
+
+# Show environments, or stop this one (files/login stay; processes end).
+sbx ls
+sbx stop pi-box
+```
+
+**Already have the older `pi-box`?** Use `--name pi-box-native` before the file
+path on each `sbx env` command, and `sbx stop pi-box-native`. Do not delete the
+old sandbox to try this setup. If your checkout folder isn't `pi-box-public`,
+adjust `agent` in `sbxenv.yaml` to match it first.
+
+Routine use does **not** require rebuilding. Image changes need a new sandbox;
+stop/start keeps the existing files and login. See [updates and deletion](#updates-tests-and-deletion)
+before replacing anything.
+
+## Files
+
+- **`sbxenv.yaml`** selects the local kit, sandbox name, and disables shared skills.
+  No `workspace` means no host project/home directory is mounted.
+- **`pi-box.yaml`** describes the kit: persistent background operation and default
+  4 CPUs/4 GiB RAM. It selects `sandbox/pi-box.dockerfile`.
+- **`sandbox/pi-box.dockerfile`** installs pinned tools/extensions and registers
+  non-secret Pi defaults at build time. Shell/Pi/tmux sessions are manual.
+- **`.dockerignore`** restricts the standard build context to reviewed inputs.
+  No temporary staging helper or Docker Desktop is required for native creation.
+
+Bundled Python/Ruff/Pi stay in image-owned `/opt` locations, with commands on
+`PATH`. Later uv installs use normal user defaults (`~/.local/share/uv` and
+`~/.local/bin`); Pi uses `~/.pi/agent`. The image does not override uv link mode
+or Pi's default version-check/telemetry behaviour.
+
+For local kits, sbx requires `agent` in `sbxenv.yaml` to match the **checkout
+folder's name**. The checked-in value is `pi-box-public`, matching this checkout.
+If you clone into a different folder, change that one value (not `name`, which
+names the sandbox). This is an sbx requirement, not a Pi model/provider choice.
+
+## One-time host setup
 
 ```bash
 brew trust docker/tap
 brew install docker/tap/sbx
 sbx login
-sbx version
 ```
 
-This workflow uses **allow-all outbound networking**, like ordinary Docker
-connectivity, rather than maintaining a project destination allowlist. On a
-fresh sbx installation:
+For a fresh installation, choose allow-all outbound networking:
 
 ```bash
 sbx policy init allow-all
 ```
 
-If a baseline is already initialized (such as balanced), do not reset policies.
-Add a global catch-all rule instead, preserving filesystem and other settings:
+For an existing initialized baseline, broaden it without resetting other rules:
 
 ```bash
 sbx policy allow network '**'
 ```
 
-These are **host-global policy changes**, affecting other local sbx sandboxes.
-Existing explicit deny rules still take precedence. The catch-all enables TCP
-access to all destinations/ports; it does not enable experimental UDP or remove
-other runtime isolation. Inspect `sbx policy ls` to see effective policies.
+This is **host-global**. Explicit denies still win; experimental UDP/ICMP runtime
+restrictions are unchanged. Open networking cannot read host files by itself,
+but can transmit anything readable inside the sandbox, including Codex tokens.
 
-Open networking does not expose host files or real proxy-managed GitHub tokens,
-but code can transmit anything readable inside the sandbox, including Codex
-login tokens. This is an accepted convenience/security trade-off.
-
-Disable SSH-agent forwarding (also host-global, affecting other sbx sandboxes):
+Disable SSH forwarding if you don't need it (also host-global):
 
 ```bash
 sbx settings set ssh.agentForwardingEnabled false
 sbx daemon restart
 ```
 
-The wrapper refuses creation while forwarding is enabled. Existing sessions
-should be finished before restarting the daemon. sbx may still set SSH_AUTH_SOCK
-inside the VM; the important check is that it points to no usable socket.
+Finish other sandbox sessions before restarting the daemon. No custom wrapper
+checks this setting now: review it yourself. Forwarding keeps private keys on
+the host but lets sandbox processes request authentication using them.
 
-For GitHub, authenticate `gh` **on the host**, then register a host-side resolver:
+For GitHub, authenticate `gh` on the host if necessary, then register a resolver:
 
 ```bash
 gh auth login
 sbx secret set github --command 'gh auth token'
 ```
 
-Skip `gh auth login` if already signed in. The host's existing token can be reused;
-a new token is not inherently required. Prefer a dedicated, narrowly scoped token
-if the host login has broader permissions than this environment needs. The
-resolver is stored rather than copying the token into the image or workspace.
-The built-in sbx shell kit provides GitHub proxy authentication. It can still
-make authorized requests and pushes: hiding the token does not limit its scope.
+The resolver runs on the host; real GitHub tokens stay outside the sandbox.
+Prefer narrowly scoped credentials. Proxying hides the token, not the ability
+to make authorized requests. Do not paste tokens into configuration or Git.
 
 ## Create and use
 
-From this repository:
+From this checkout, use an explicit environment path to avoid unrelated
+`~/.sbxenv.yaml` defaults:
 
 ```bash
-make sandbox-create
-make sandbox-start
-make sandbox-shell
+sbx env plan ./sbxenv.yaml
+sbx env create ./sbxenv.yaml
+sbx env exec -it ./sbxenv.yaml -- bash -l
 ```
 
-Creation builds pinned development tools and extensions from reviewed files. It
-shares **no host workspace**, disables shared skills, and defaults to 4 CPUs and
-4 GiB RAM. The build context is a temporary allowlisted directory, not this
-checkout, your home, or `.env`. No Docker Engine image store is assumed.
+Creation builds the local kit automatically, with cached image layers. Review
+and approve the plan. There are no declared host lifecycle commands, workspace
+mounts, or model secrets. The kit keeps the VM running after clients disconnect.
 
-This opens a plain login shell; no Pi process or tmux session is started for you.
-You can also enter directly with `sbx exec -it pi-box bash -l`. Inside it:
+**If an older `pi-box` sandbox already exists**, do not delete it to adopt this
+file. Use a different name for the trial, consistently on each command:
+
+```bash
+sbx env plan --name pi-box-native ./sbxenv.yaml
+sbx env create --name pi-box-native ./sbxenv.yaml
+sbx env exec -it --name pi-box-native ./sbxenv.yaml -- bash -l
+```
+
+Inside the sandbox:
 
 ```bash
 cd ~/workspace
@@ -94,117 +144,118 @@ cd REPOSITORY
 pi
 ```
 
-In Pi, use **`/login` → OpenAI/Codex**. Complete the browser/pasted-callback flow,
-or device-code login if offered by the pinned Pi version. No model API key or
-host OAuth proxy configuration is required. A callback reaching localhost on
-your client rather than the sandbox is not a reason to expose a public port;
-use the offered manual callback/device flow instead.
+Use Pi **`/login` → OpenAI/Codex**, completing the browser/pasted callback flow
+or device-code flow if offered. **Access/refresh tokens live inside the sandbox**
+and are readable by its processes. Keep them out of logs, traces, Git, and saved
+images. The kit never seeds or rewrites `auth.json`.
 
-**Codex access and refresh tokens live inside the sandbox**, readable by Pi and
-its commands. They persist across stop/start. Keep them out of Git, traces,
-logs, template snapshots, and published images. This is an accepted trade-off,
-not equivalent to proxy-managed model credentials. We never seed or replace
-Pi's auth.json from kit configuration.
+Set Git identity separately with `git config --global user.name` and
+`git config --global user.email`. Host-proxied GitHub API and private HTTPS Git
+reads were verified; write testing needs an approved disposable branch.
 
-Git identity is independent of authentication. Set a non-secret identity inside
-the sandbox before committing:
+## Everyday commands
 
 ```bash
-git config --global user.name 'Your Name'
-git config --global user.email 'you@example.com'
+sbx env run --detach ./sbxenv.yaml           # create/start without attaching
+sbx env exec -it ./sbxenv.yaml -- bash -l   # plain shell
+sbx env exec -it ./sbxenv.yaml -- pi        # direct Pi invocation
+sbx ls
+sbx stop pi-box                            # keeps files, ends processes
 ```
 
-HTTPS Git access uses the host proxy; no plaintext credential-store helper is
-installed. GitHub API and private Git read access were verified. A write test
-requires an explicitly chosen disposable branch/repository; it is not performed
-by the smoke test. Non-GitHub hosting needs separate configuration.
+Your aliases can still use `sbx exec -it pi-box bash -l` directly. Manage tmux
+yourself if wanted, e.g. `tmux new-session -A -s dev`. SSH to the hosting Mac to
+use the same commands remotely. The Mac must stay awake/online. Neither stop
+nor reboot preserves live Pi/tmux processes; workspace and login files persist.
 
-## Lifecycle and SSH
+## Optional shared storage
+
+Local sbx supports sharing a **host directory**, not attaching an existing Docker
+named volume. Use a dedicated directory on the **sandbox host** (not each SSH
+client), containing only data you intend Pi to access. This is optional; the
+checked-in environment stays mountless.
+
+For example, on the host, replace `/absolute/path/to/pi-box-data` with your chosen
+absolute path everywhere below:
 
 ```bash
-make sandbox-status
-make sandbox-shell       # plain shell; sessions are managed manually
-make sandbox-stop        # retains files, but ends running processes
-make sandbox-start       # keeps the VM running without connected clients
+mkdir -p /absolute/path/to/pi-box-data/repos /absolute/path/to/pi-box-data/state/pi
+chmod 700 /absolute/path/to/pi-box-data /absolute/path/to/pi-box-data/state
 ```
 
-Manage sessions yourself, for example `tmux new-session -A -s dev` inside the
-sandbox. No tmux configuration or session launcher is supplied by the sandbox
-image. You can invoke Pi directly with `sbx exec -it pi-box pi` too; use your own
-session-management approach if the process must survive a disconnect.
+Create a private `sbxenv.local.yaml` beside `sbxenv.yaml`:
 
-To reconnect remotely, SSH to the Mac host, enter with `sbx exec -it pi-box bash -l`,
-and attach to any session you created yourself. Connecting clients need SSH
-access only, not Codex/GitHub credentials. The Mac must remain awake and online.
-Detached mode keeps the VM running without clients; it does not preserve live
-processes across host reboot or sandbox stop.
+```yaml
+name: pi-box-shared
+workspace: /absolute/path/to/pi-box-data
+env:
+  PI_CODING_AGENT_DIR: /absolute/path/to/pi-box-data/state/pi
+  GIT_CONFIG_GLOBAL: /absolute/path/to/pi-box-data/state/gitconfig
+```
 
-Set a distinct name without editing `.env`:
+The host directory is shared read-write **at the same absolute path inside the
+sandbox**. The sandbox starts there, not at `~/workspace`. `repos/` holds Git
+checkouts and `state/` holds Pi/Git settings separately from those repositories.
+If you only want shared repositories, omit the `env` section: Pi login and Git
+settings will then remain inside the sandbox and be lost on its deletion.
+
+Use both files, in the same order, for every environment command:
 
 ```bash
-SANDBOX_NAME=pi-box-experiment make sandbox-create
-SANDBOX_NAME=pi-box-experiment make sandbox-start
+sbx env plan ./sbxenv.yaml ./sbxenv.local.yaml
+sbx env create ./sbxenv.yaml ./sbxenv.local.yaml
+# Once for a new shared Pi state directory: seed non-secret extension defaults.
+sbx env exec ./sbxenv.yaml ./sbxenv.local.yaml -- node /opt/pi/init-agent.mjs
+sbx env exec -it ./sbxenv.yaml ./sbxenv.local.yaml -- bash -l
+# Inside: cd repos; clone your repositories; run pi and /login.
+# Set Git user.name/user.email normally; GIT_CONFIG_GLOBAL persists them.
 ```
 
-The wrapper deliberately does not load Compose's `.env`. Create refuses to
-replace an existing name; start/shell refuse a missing name. They never use
-bare `sbx run AGENT`, which could implicitly share the current host directory.
+No separate Git volume is needed: the Git configuration file is in `state/`,
+and the GitHub token still comes from the host proxy. With the `env` section,
+Codex login/settings/history are in the shared Pi directory. User-installed uv
+tools and other files elsewhere inside the sandbox are **not** persisted by this
+example.
 
-## sbx v0.49.2 compatibility path
+**Security trade-off:** Pi can modify/delete everything in the shared directory,
+and can read its Codex tokens. Keep it private and out of Git/backups you share;
+do not mount your home directory, SSH keys, or host credential stores. Sharing
+state across sandboxes also shares that trust boundary; avoid concurrent use of
+the same Pi state directory.
 
-This version builds v3 workloads but rejects a custom agent identity during
-creation. The wrapper therefore:
+Mount changes require a **new sandbox**. This example uses a different name and
+doesn't alter an existing mountless sandbox. Shared host files survive sandbox
+removal, but aren't automatically backed up. Review the destroy plan before
+removing/recreating anything; don't delete the host directory. These instructions
+follow the native environment-file interface; this shared-storage variant has
+not been live-tested here.
 
-1. Builds/inspects the v3 descriptor using sbx's managed builder.
-2. Extracts the resulting image reference and resource limits.
-3. Creates the built-in **shell** agent with that image, with no project
-   network-policy mixin; host network policy applies.
-4. Opens a plain shell when requested. Pi's non-secret extension registrations
-   are already initialized in the image at build time.
+## Updates, tests, and deletion
 
-This avoids overriding a built-in agent or duplicating shell's GitHub credential
-service (both rejected by this version). There is no custom session launcher.
-The source v3 long-running request is not applied by this template-based path;
-**run `make sandbox-start` for detached persistence**.
-The shell kit can run its own package setup at startup. Existing sandboxes do
-not acquire kit/image changes merely because source files changed.
-
-## Tests and updates
+Code changes inside repositories need no rebuild. Image/kit changes apply to
+**newly created** sandboxes, not existing ones. Create a differently named trial,
+clone/push repositories, and log in again when using the mountless default.
+With optional shared storage, reuse that host directory instead. No lifecycle
+command upgrades an existing filesystem in place. Run `plan` before applying changes. `sbx env` and
+its file format are experimental.
 
 ```bash
-npm test                     # no sbx installation/login required
-make sandbox-validate        # live builder validation; not an offline check
-node tests/sandbox-smoke.mjs  # live tools/config check; no model or Git writes
-# Explicitly destructive to running processes, but retains files:
-PI_BOX_SANDBOX_RESTART=1 node tests/sandbox-smoke.mjs
+npm test                              # no sbx/KVM/login required
+sbx kit validate .                    # live kit build/validation
+node tests/sandbox-smoke.mjs          # live check of existing pi-box
+# Optional restart test ends running sessions:
+SANDBOX_NAME=pi-box-native PI_BOX_SANDBOX_RESTART=1 node tests/sandbox-smoke.mjs
 ```
 
-Normal CI continues to build/smoke-test the existing images and Compose path.
-Host-side tests cover sandbox command safety and staging. Live sbx testing is
-opt-in on a compatible host; it is not assumed available on all CI runners.
+CI builds/smoke-tests the sandbox Dockerfile with ordinary Docker on AMD64 and
+ARM64, without sbx or credentials. Live micro-VM and login checks are separate.
 
-For image changes, create a differently named sandbox and validate it. Push all
-work first, clone again, and repeat `/login` there. Do not snapshot a logged-in
-sandbox to produce a distributable image. The current wrapper intentionally has
-no remove, recreate, reset, or prune command.
+`sbx env rm ./sbxenv.yaml` is **destructive**: it deletes repositories,
+credentials, and history stored internally (not optional shared host files). Review its plan; don't use it for routine updates.
+Back up/push all branches and account for ignored/untracked files first. Never
+publish snapshots of logged-in sandboxes or use global pruning for migration.
+Compose storage is independent and is not migrated or deleted by this workflow.
 
-## Cutover and deletion
-
-Do not delete old Compose volumes until the sandbox works for your actual Codex
-account and Git workflow. Verify all branches and unpushed/untracked/ignored
-files; a Git push does not save arbitrary workspace files. Optional database or
-trace volumes need a separate retention decision.
-
-Removing a sandbox deletes its internal repositories, credentials, and history.
-Stop/start retains them; deletion/recreation does not. Review exact names and
-confirm before using `sbx rm` or removing old Docker volumes. Never use global
-pruning as migration cleanup. Rotate/revoke superseded credentials where needed;
-volume deletion is not guaranteed secure erasure.
-
-## Deferred
-
-Optional PostgreSQL, Browserless, Phoenix, host folder sharing, and remote/cloud
-hosting are not integrated into this initial workflow. Web extensions may need
-their own authentication; Codex login does not
-configure unrelated providers. These are not automatically inherited from the
-old agent volume or host Pi configuration.
+Optional sidecars and remote/cloud deployment are deferred.
+Web/search providers still need their own authentication; Codex login doesn't
+configure them.

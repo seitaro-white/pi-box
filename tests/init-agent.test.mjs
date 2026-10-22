@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { root, readJson } from "./helpers/files.mjs";
 import { agentState } from "./helpers/agent-state.mjs";
+import { readJson, root, temporaryDirectory } from "./helpers/files.mjs";
 
 const defaults = readJson(
   join(root, "container/defaults/settings.json"),
@@ -47,6 +48,18 @@ function assertOperatorState(state) {
 }
 
 describe("agent initialization", () => {
+  it("uses the current home and adjacent defaults without environment overrides", (t) => {
+    const home = temporaryDirectory(t, "pi-box-home-");
+    const env = { ...process.env, HOME: home };
+    delete env.PI_CODING_AGENT_DIR;
+    delete env.PI_BOX_DEFAULTS_DIR;
+    execFileSync(process.execPath, [join(root, "container/init-agent.mjs")], { env });
+    const dir = join(home, ".pi", "agent");
+    assert.deepEqual(readJson(join(dir, "settings.json")), { packages: defaults });
+    assert.equal(statSync(join(dir, "settings.json")).mode & 0o777, 0o600);
+    assert.equal(existsSync(join(dir, "auth.json")), false);
+  });
+
   it("seeds the correct private settings for fresh base and recommended installs", (t) => {
     for (const profile of ["base", "recommended"]) {
       const state = agentState(t);

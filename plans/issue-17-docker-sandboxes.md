@@ -1,5 +1,15 @@
 # Issue #17: fresh, mountless Docker Sandboxes deployment
 
+## Current direction
+
+Compose remains the primary development workflow. sbx stays optional and mountless
+by default; no cutover or deletion of old volumes is planned. Local sbx v0.49.2
+has no reusable named-volume interface (cloud-only). Document optional dedicated
+host-directory sharing instead, including Pi state and Git configuration, without
+enabling it by default. See docs/sandboxes.md#optional-shared-storage; this variant
+is documented but has not been live-tested. Earlier migration/cutover steps below
+are historical proposals, not authorization to remove anything.
+
 ## Decisions
 
 - Initial host: Apple Silicon Mac. Clients SSH to the hosting machine; clients do not need model credentials.
@@ -11,6 +21,22 @@
 - Optional host mounts and PostgreSQL/Browserless/Phoenix integration are deferred.
 - Sessions are managed by the user: no sandbox launcher or custom tmux config, and no Make attach targets for either runtime. Register extensions at image build time; keep tmux installed as an optional tool.
 - Outbound networking is allow-all by user choice. Existing balanced baseline was broadened with a global `sbx policy allow network '**'` TCP rule, avoiding a reset of filesystem/other policies. Removed the project allowlist and now-unnecessary access mixin. Explicit denies and runtime UDP/ICMP limitations still apply.
+- Prefer native configuration over custom code: manage lifecycle/builds with `sbx env` and `sbxenv.yaml`; standard `.dockerignore` controls build inputs. No sandbox lifecycle/staging helper or Make targets.
+
+## Sandbox default cleanup (2026-10-22)
+
+- Removed runtime uv directory/link-mode overrides, redundant Pi config/defaults/profile variables, and optional Pi version-check/telemetry overrides from the sandbox Dockerfile. Removed fd/bat aliases and use batcat as the pager.
+- Shared initializer now falls back to the current HOME's .pi/agent rather than /home/node; explicit overrides for Compose/tests remain supported. Build-time /opt locations and required PATH/proxy/CA/shell settings stay intact.
+- Fresh disposable native sandbox verified uv's normal Python/tool/bin locations, Pi extension initialization without env overrides, runtime smoke, and fdfind/batcat commands. All 52 host tests pass. Existing pi-box and original Compose image environment remain unchanged.
+
+## Native environment replacement (2026-10-22)
+
+- Committed the previous custom-wrapper implementation as checkpoint `08ac5c7` before this change.
+- Replaced scripts/sandbox.mjs and Make sandbox-* targets with native sbxenv.yaml, referencing the local kit. Moved pi-box.yaml to the repository root, selected sandbox/pi-box.dockerfile explicitly, and reused the standard .dockerignore/.containerignore allowlists instead of custom staging.
+- Native `sbx env create` successfully handles custom agent registration on v0.49.2: the previous direct-create workaround is unnecessary. No image-build helper is required either.
+- Local kit identity must match its checkout directory. sbxenv.yaml uses agent: pi-box-public for this checkout; document changing that value if cloned under another name.
+- Validated named disposable native environments: plan/create/exec, mountless workspace, 4 CPUs/4 GiB, automatic background persistence from kit capability, registered tools/extensions, outbound HTTPS, private host-proxied Git reads, and stop/start persistence. Existing pi-box remains untouched and is not adopted/recreated automatically; its shell agent differs from the new kit.
+- Simplified CI to build the normal Dockerfile from the filtered repository context; replaced wrapper tests with declarative configuration tests. All 50 host tests pass. Codex login/refresh and remote CI remain pending.
 
 ## Networking simplification (2026-10-22)
 
@@ -59,7 +85,7 @@ Gate: a named environment starts without host workspace mounts and can run a she
 
 ### 2. Package the existing environment
 
-- Add a separate `sandbox/` environment definition/build recipe and retain the existing Compose path until cutover.
+- Use sbxenv.yaml plus root pi-box.yaml selecting sandbox/pi-box.dockerfile; retain the existing Compose path until cutover.
 - Reuse pinned runtime manifests/lockfiles and non-secret defaults where appropriate. Preserve the recommended tools, extensions, LSP setup, Python/uv, Git, and tmux.
 - Explicitly reconcile `/home/node` versus the sandbox template's user/home and `/workspace` versus `/home/agent/workspace`; do not blindly reuse path-specific initialization.
 - Create a writable in-sandbox workspace and Pi config directory. Do not initialize plaintext Git credential storage by default.
@@ -83,7 +109,7 @@ Gate: Codex is usable and persistent; Git access is working with its actual cred
 
 ### 4. Implement lifecycle and remote access
 
-- Add sandbox-specific Make targets or a wrapper for build/create, background start, shell/exec, status, and stop. Existing `make up` remains Compose-based until the documented cutover. Neither runtime has a Make attach target.
+- Use native sbx env plan/create/run/exec and sbx stop/ls for lifecycle. No custom lifecycle wrapper or sandbox Make targets. Existing `make up` remains Compose-based; neither runtime has a Make attach target.
 - Use a stable configurable sandbox name. Existing-name attachment must never silently create a new environment with a host mount.
 - Use detached/background mode to keep the VM running without client sessions. Session management (including optional tmux) is manual; do not create sessions or launch Pi automatically.
 - Confirm `sbx exec` starts a shell with the expected environment and working directory. Validate tmux reconnection after an SSH client disconnect.

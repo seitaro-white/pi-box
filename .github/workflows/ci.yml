@@ -94,17 +94,12 @@ jobs:
       - name: Smoke-test recommended image
         run: PI_BOX_PROFILE=recommended PI_BOX_IMAGE=pi-box:ci-recommended node tests/smoke.mjs
 
-      # Build only reviewed inputs, not the checkout or any local credentials.
-      # This tests the sandbox image without sbx, KVM, or interactive login.
-      - name: Stage sandbox image context
-        run: |
-          node --input-type=module -e 'import {stageKit} from "./scripts/sandbox.mjs"; console.log("SANDBOX_CONTEXT=" + stageKit())' >> "$GITHUB_ENV"
-
+      # .dockerignore restricts build inputs; no sbx, KVM, or login required.
       - name: Build sandbox image
         uses: docker/build-push-action@v7
         with:
-          context: ${{ env.SANDBOX_CONTEXT }}
-          file: ${{ env.SANDBOX_CONTEXT }}/pi-box.dockerfile
+          context: .
+          file: sandbox/pi-box.dockerfile
           platforms: linux/${{ matrix.arch }}
           tags: pi-box:ci-sandbox
           load: true

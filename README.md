@@ -32,9 +32,13 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
 ## Installation and usage
 
 **Docker Sandboxes (opt-in):** a mountless micro-VM deployment is available for
-Apple Silicon Macs. See the [sandbox setup guide](docs/sandboxes.md) for
-installation, Codex `/login`, host-proxied GitHub access, and SSH/tmux usage.
-This path runs alongside Compose; it does not migrate or delete existing volumes.
+Apple Silicon Macs, managed with native `sbx env` commands and [`sbxenv.yaml`](sbxenv.yaml).
+See the [sandbox setup guide](docs/sandboxes.md) for installation, Codex `/login`,
+host-proxied GitHub access, and manual session management.
+Compose remains the primary workflow, with reusable named volumes. The optional
+sandbox defaults to internal storage that survives stop/start but not deletion;
+[shared host-directory storage](docs/sandboxes.md#optional-shared-storage) is also
+documented. Neither path migrates or deletes the other's storage.
 
 Prerequisites for the existing Compose workflow: Docker with Compose v5.0 or newer.
 

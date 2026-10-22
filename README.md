@@ -31,7 +31,12 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
 
 ## Installation and usage
 
-Prerequisites: Docker with Compose v5.0 or newer.
+**Docker Sandboxes (opt-in):** a mountless micro-VM deployment is available for
+Apple Silicon Macs. See the [sandbox setup guide](docs/sandboxes.md) for
+installation, Codex `/login`, host-proxied GitHub access, and SSH/tmux usage.
+This path runs alongside Compose; it does not migrate or delete existing volumes.
+
+Prerequisites for the existing Compose workflow: Docker with Compose v5.0 or newer.
 
 With Docker running, run:
 
@@ -181,7 +186,7 @@ The unauthenticated UI binds only to host loopback at `http://localhost:6006`; t
 
 ### Tailscale
 
-Tailscale can provide private access to the Docker host or VM. Run it on the host and client, SSH to the host over your tailnet, then use `make attach` from the repository directory.
+Tailscale can provide private access to the Docker host or VM. Run it on the host and client, SSH to the host over your tailnet, then run `docker compose exec -it pi-box bash -l` from the repository directory and manage sessions yourself.
 
 No Tailscale daemon or SSH server is needed inside Pi-box. This uses ordinary SSH over Tailscale, not the separate Tailscale SSH feature; configure host SSH access and tailnet rules accordingly. The host must remain awake and online.
 

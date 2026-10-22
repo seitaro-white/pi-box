@@ -20,7 +20,7 @@ If you already use other overlays, append `:compose.phoenix.yaml` to your existi
 
 ```bash
 make up
-make attach
+docker compose exec -it pi-box bash -l
 ```
 
 ## Send Pi traces

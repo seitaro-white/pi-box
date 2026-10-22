@@ -84,5 +84,12 @@ does not disable the Pi exporter.
 ## Further details
 
 Phoenix displays agent/LLM/tool spans and token usage, but its native cost totals
-are not populated by this setup. For compatibility details and acceptance-test
-results, see the [validation notes](../plans/phoenix-observability-validation.md).
+are not populated by this setup. Historical compatibility investigations are recorded
+in the [validation notes](../plans/phoenix-observability-validation.md).
+
+For repeatable integration acceptance against a prebuilt Pi image, run
+`npm run test:integration -- phoenix`. It installs the documented exporter in
+disposable storage, checks that a synthetic Pi workflow reaches Phoenix, and
+verifies trace storage survives backend recreation. Detailed exporter schema,
+token accounting and retry semantics belong to upstream tests, not this suite.
+See the [test guide](../tests/README.md) for isolation and cleanup behaviour.

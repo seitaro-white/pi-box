@@ -1,155 +1,171 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { temporaryDirectory } from "./helpers/files.mjs";
 
+const container = "pi-box-main-container";
 const volumes = [
   { source: "workspace", target: "/workspace" },
   { source: "agent", target: "/home/node/.pi/agent" },
   { source: "git", target: "/home/node/.config/git" },
 ];
 
-for (const [scenario, error] of [
-  ["fresh"],
-  ["normal"],
-  ["standalone", /not managed by this Compose project/],
-  ["inherited-labels", /not managed by this Compose project/],
-  ["unsafe-git", /non-persistent/],
-  ["unsafe-ssh", /non-persistent/],
-  ["unsafe-link", /non-persistent/],
-  ["mounts", /Unexpected mounts/],
-  ["readonly", /Unexpected mounts/],
-  ["bind", /Unexpected mounts/],
-  ["stopped", /Start .* first/],
-  ["shared-git", /in use by other/],
-  ["foreign-project", /not managed by this Compose project/],
-  ["foreign-service", /not managed by this Compose project/],
-  ["renamed", /differently named/],
-  ["legacy-pi", /Legacy Compose service pi found/],
-  ["legacy-db", /Legacy Compose service db found/],
-  ["bad-image", /Git volume/],
-  ["bad-config", /three writable named volumes/],
-  ["duplicate-volume", /must be distinct/],
-  ["docker-error", /synthetic daemon error/],
-  ["inspect-error", /synthetic inspection error/],
-]) {
-  test(`Compose preflight: ${scenario}`, () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-box-preflight-"));
-    try {
-      const home = join(dir, "home");
-      const log = join(dir, "calls");
-      mkdirSync(join(home, ".config/git"), { recursive: true });
-      writeFileSync(
-        join(home, ".config/git/config"),
-        "[user]\nname = Synthetic\n",
-      );
-      const unsafe = { "unsafe-git": ".gitconfig", "unsafe-ssh": ".ssh" }[
-        scenario
-      ];
-      if (unsafe) writeFileSync(join(home, unsafe), "SYNTHETIC");
-      if (scenario === "unsafe-link") {
-        // Create a dangling link: it must still block replacement.
-        const result = spawnSync("ln", [
-          "-s",
-          "missing",
-          join(home, ".git-credentials"),
-        ]);
-        assert.equal(result.status, 0);
-      }
-      writeFileSync(
-        join(dir, "docker"),
-        `#!${process.execPath}
+function preflightFixture() {
+  return {
+    config: {
+      name: "pi-box",
+      services: {
+        "pi-box": {
+          container_name: container,
+          image: "pi-box:test",
+          volumes: volumes.map((volume) => ({ ...volume, type: "volume" })),
+        },
+      },
+      volumes: Object.fromEntries(
+        volumes.map(({ source }) => [source, { name: `pi-box-${source}` }]),
+      ),
+    },
+    image: [{ Config: { Env: ["GIT_CONFIG_GLOBAL=/home/node/.config/git/config"] } }],
+    owned: [container],
+    names: [container],
+    existing: [{
+      Config: { Labels: {
+        "com.docker.compose.config-hash": "synthetic-hash",
+        "com.docker.compose.project": "pi-box",
+        "com.docker.compose.service": "pi-box",
+      } },
+      State: { Running: true },
+      Mounts: volumes.map(({ source, target }) => ({
+        Type: "volume", RW: true, Name: `pi-box-${source}`, Destination: target,
+      })),
+    }],
+    users: {},
+  };
+}
+
+// Only command routing runs in the fake executable; policy scenarios stay here.
+function runPreflight(t, fixture) {
+  const dir = temporaryDirectory(t, "pi-box-preflight-");
+  const home = join(dir, "home");
+  const log = join(dir, "calls");
+  mkdirSync(join(home, ".config/git"), { recursive: true });
+  const gitConfig = join(home, ".config/git/config");
+  writeFileSync(gitConfig, "[user]\nname = Synthetic\n");
+  if (fixture.unsafePath === ".git-credentials") {
+    // Dangling links must also block replacement.
+    symlinkSync("missing", join(home, fixture.unsafePath));
+  } else if (fixture.unsafePath) {
+    writeFileSync(join(home, fixture.unsafePath), "SYNTHETIC");
+  }
+  writeFileSync(join(dir, "fixture.json"), JSON.stringify(fixture));
+  writeFileSync(join(dir, "docker"), String.raw`#!${process.execPath}
 const fs = require("node:fs");
 const { spawnSync } = require("node:child_process");
 const args = process.argv.slice(2);
-const scenario = process.env.SCENARIO;
-const volumes = ${JSON.stringify(volumes)};
-fs.appendFileSync(process.env.LOG, JSON.stringify(args) + "\\n");
-if (scenario === "docker-error") {
-  console.error("synthetic daemon error"); process.exit(1);
+const fixture = JSON.parse(fs.readFileSync(process.env.FIXTURE, "utf8"));
+fs.appendFileSync(process.env.LOG, JSON.stringify(args) + "\n");
+let output;
+switch (args.slice(0, 2).join(" ")) {
+  case "compose config": output = fixture.config; break;
+  case "image inspect": output = fixture.image; break;
+  case "container ls": output = (args.includes("--filter") ? fixture.owned : fixture.names).join("\n"); break;
+  case "container inspect": output = fixture.existing; break;
+  case "ps --filter": output = (fixture.users[args[2]] || []).join("\n"); break;
+  case "exec -i": {
+    const script = fs.readFileSync(0, "utf8").replaceAll("/home/node", process.env.TEST_HOME);
+    const result = spawnSync("sh", ["-s"], { input: script, stdio: ["pipe", "inherit", "inherit"] });
+    process.exit(result.status ?? 1);
+  }
+  default: throw new Error("Unexpected Docker command: " + args.join(" "));
 }
-if (args[0] === "compose") {
-  console.log(JSON.stringify({
-    name: "pi-box", services: { "pi-box": {
-      container_name: "pi-box-main-container", image: "pi-box:test",
-      volumes: scenario === "bad-config" ? [] : volumes.map(v => ({ ...v, type: "volume" })),
-    } },
-    volumes: Object.fromEntries(volumes.map(v => [v.source, { name: scenario === "duplicate-volume" ? "same" : "pi-box-" + v.source }])),
-  }));
-} else if (args[0] === "image") {
-  console.log(JSON.stringify([{ Config: { Env: scenario === "bad-image" ? [] : ["GIT_CONFIG_GLOBAL=/home/node/.config/git/config"] } }]));
-} else if (args[0] === "container" && args[1] === "ls") {
-  if (args.includes("--filter")) {
-    if (scenario === "renamed" && args.includes("label=com.docker.compose.service=pi-box")) console.log("old-name");
-    if (scenario === "legacy-pi" && args.includes("label=com.docker.compose.service=pi")) console.log("legacy-dev");
-    if (scenario === "legacy-db" && args.includes("label=com.docker.compose.service=db")) console.log("legacy-postgres");
-  } else if (scenario !== "fresh") console.log("pi-box-main-container");
-} else if (args[0] === "container" && args[1] === "inspect") {
-  if (scenario === "inspect-error") { console.error("synthetic inspection error"); process.exit(1); }
-  console.log(JSON.stringify([{
-    Id: "synthetic-container-id",
-    Config: { Labels: scenario === "standalone" ? {} : {
-      ...(scenario === "inherited-labels" ? {} : { "com.docker.compose.config-hash": "synthetic-hash" }),
-      "com.docker.compose.project": scenario === "foreign-project" ? "other" : "pi-box",
-      "com.docker.compose.service": scenario === "foreign-service" ? "other" : "pi-box",
-    } },
-    State: { Running: scenario !== "stopped" },
-    Mounts: (scenario === "mounts" ? volumes.slice(0, 2) : volumes).map(v => ({
-      Type: scenario === "bind" ? "bind" : "volume", RW: scenario !== "readonly",
-      Name: "pi-box-" + v.source, Destination: v.target,
-    })),
-  }]));
-} else if (args[0] === "exec") {
-  const script = fs.readFileSync(0, "utf8").replaceAll("/home/node", process.env.TEST_HOME);
-  const result = spawnSync("sh", ["-s"], { input: script, stdio: ["pipe", "inherit", "inherit"] });
-  process.exit(result.status ?? 1);
-} else if (args[0] === "ps" && scenario === "shared-git" && args.includes("volume=pi-box-git")) {
-  console.log("other");
+console.log(typeof output === "string" ? output : JSON.stringify(output));
+`, { mode: 0o755 });
+  const result = spawnSync(process.execPath, ["scripts/check-container.mjs"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${dir}:${process.env.PATH}`,
+      FIXTURE: join(dir, "fixture.json"),
+      LOG: log,
+      TEST_HOME: home,
+    },
+  });
+  const calls = readFileSync(log, "utf8").trim().split("\n").map(JSON.parse);
+  for (const args of calls) {
+    if (args[0] === "exec") {
+      assert.deepEqual(args, ["exec", "-i", container, "sh", "-s"]);
+    } else {
+      assert.ok([
+        "compose config", "image inspect", "container ls", "container inspect", "ps --filter",
+      ].includes(args.slice(0, 2).join(" ")), `preflight must be read-only: ${args}`);
+    }
+  }
+  assert.equal(readFileSync(gitConfig, "utf8"), "[user]\nname = Synthetic\n");
+  return { result, calls };
 }
-`,
-        { mode: 0o755 },
-      );
-      const result = spawnSync(
-        process.execPath,
-        ["scripts/check-container.mjs"],
-        {
-          encoding: "utf8",
-          env: {
-            ...process.env,
-            PATH: `${dir}:${process.env.PATH}`,
-            SCENARIO: scenario,
-            LOG: log,
-            TEST_HOME: home,
-          },
-        },
-      );
-      assert.equal(result.status, error ? 1 : 0, result.stderr);
-      if (error) assert.match(result.stderr, error);
-      const calls = readFileSync(log, "utf8")
-        .trim()
-        .split("\n")
-        .map(JSON.parse);
-      for (const service of ["pi", "db"]) {
-        const legacyCheck = calls.find((args) =>
-          args.includes(`label=com.docker.compose.service=${service}`),
-        );
-        if (legacyCheck) assert.ok(legacyCheck.includes("--all"), "check stopped legacy containers too");
-        if (["fresh", "normal"].includes(scenario)) assert.ok(legacyCheck, `check legacy service ${service}`);
+
+for (const [scenario, change, error] of [
+  ["fresh", (fixture) => { fixture.names = []; fixture.owned = []; }],
+  ["normal", () => {}],
+  [
+    "standalone",
+    (fixture) => { fixture.existing[0].Config.Labels = {}; },
+    /not managed by this Compose project/,
+  ],
+  [
+    "inherited-labels",
+    (fixture) => { delete fixture.existing[0].Config.Labels["com.docker.compose.config-hash"]; },
+    /not managed by this Compose project/,
+  ],
+  ...[".gitconfig", ".ssh", ".git-credentials"].map((path) => [
+    `non-persistent ${path}`, (fixture) => { fixture.unsafePath = path; }, /non-persistent/,
+  ]),
+  ["missing mount", (fixture) => { fixture.existing[0].Mounts.pop(); }, /Unexpected mounts/],
+  ["readonly mount", (fixture) => { fixture.existing[0].Mounts[0].RW = false; }, /Unexpected mounts/],
+  ["bind mount", (fixture) => { fixture.existing[0].Mounts[0].Type = "bind"; }, /Unexpected mounts/],
+  ["stopped", (fixture) => { fixture.existing[0].State.Running = false; }, /Start .* first/],
+  ["shared Git volume", (fixture) => { fixture.users["volume=pi-box-git"] = ["other"]; }, /in use by other/],
+  [
+    "foreign project",
+    (fixture) => { fixture.existing[0].Config.Labels["com.docker.compose.project"] = "other"; },
+    /not managed by this Compose project/,
+  ],
+  [
+    "foreign service",
+    (fixture) => { fixture.existing[0].Config.Labels["com.docker.compose.service"] = "other"; },
+    /not managed by this Compose project/,
+  ],
+  ["renamed", (fixture) => { fixture.owned = ["old-name"]; }, /differently named/],
+  ["image without Git volume support", (fixture) => { fixture.image[0].Config.Env = []; }, /Git volume/],
+  [
+    "invalid Compose mounts",
+    (fixture) => { fixture.config.services["pi-box"].volumes = []; },
+    /three writable named volumes/,
+  ],
+  [
+    "duplicate volume",
+    (fixture) => { fixture.config.volumes.git.name = "pi-box-agent"; },
+    /must be distinct/,
+  ],
+]) {
+  test(`Compose preflight: ${scenario}`, (t) => {
+    const fixture = preflightFixture();
+    change(fixture);
+    const { result, calls } = runPreflight(t, fixture);
+    assert.equal(result.status, error ? 1 : 0, result.stderr);
+    if (error) assert.match(result.stderr, error);
+    else {
+      assert.match(result.stdout, /Preflight passed/);
+      const owned = calls.find((args) => args.includes("label=com.docker.compose.service=pi-box"));
+      assert.ok(owned?.includes("--all"), "check stopped project containers too");
+      assert.ok(owned.includes("label=com.docker.compose.project=pi-box"));
+      assert.ok(owned.includes("label=com.docker.compose.config-hash"));
+      assert.equal(calls.some((args) => args[0] === "exec"), scenario === "normal");
+      for (const { source } of volumes) {
+        assert.ok(calls.some((args) => args[0] === "ps" && args.includes(`volume=pi-box-${source}`)));
       }
-      const mutations = calls.filter((args) =>
-        ["stop", "rm", "run", "volume"].includes(args[0]),
-      );
-      assert.deepEqual(mutations, [], "preflight must always be read-only");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
     }
   });
 }

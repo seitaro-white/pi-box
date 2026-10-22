@@ -66,11 +66,6 @@ if (!validPackages(baseline.packages)) {
 }
 
 // Track only image-owned paths, not npm/git sources installed by the operator.
-// The two legacy paths migrate volumes created before ownership was recorded.
-const legacy = [
-  "/opt/pi/node_modules/pi-subagents",
-  "/opt/pi/node_modules/pi-web-access",
-];
 const managedPath = join(dir, "pi-box-packages.json");
 let previous;
 let hadOwnership = true;
@@ -81,7 +76,7 @@ try {
     throw error;
   }
   hadOwnership = false;
-  previous = { version: 1, packages: legacy };
+  previous = { version: 1, packages: [] };
 }
 if (
   previous?.version !== 1 ||

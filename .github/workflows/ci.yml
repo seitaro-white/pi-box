@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -76,9 +77,6 @@ jobs:
           cache-from: type=gha,scope=pi-box-${{ matrix.arch }}-base
           cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-base,mode=max
 
-      - name: Smoke-test base image
-        run: PI_BOX_PROFILE=base PI_BOX_IMAGE=pi-box:ci-base node tests/smoke.mjs
-
       - name: Build recommended image
         uses: docker/build-push-action@v7
         with:
@@ -90,9 +88,6 @@ jobs:
           push: false
           cache-from: type=gha,scope=pi-box-${{ matrix.arch }}-recommended
           cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-recommended,mode=max
-
-      - name: Smoke-test recommended image
-        run: PI_BOX_PROFILE=recommended PI_BOX_IMAGE=pi-box:ci-recommended node tests/smoke.mjs
 
       # .dockerignore restricts build inputs; no sbx, KVM, or login required.
       - name: Build sandbox image
@@ -107,15 +102,10 @@ jobs:
           cache-from: type=gha,scope=pi-box-${{ matrix.arch }}-sandbox
           cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-sandbox,mode=max
 
-      - name: Smoke-test sandbox image without sbx
-        run: node tests/sandbox-image.mjs
-
-      - name: Verify Compose lifecycle and persistence
-        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/compose.mjs
-
-      - name: Verify optional PostgreSQL
-        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/postgres-integration.mjs
-
-      # The acceptance test pulls the overlay's same multi-architecture digest.
-      - name: Verify optional Browserless Chromium
-        run: PI_BOX_RECOMMENDED_IMAGE=pi-box:ci-recommended node tests/browserless-integration.mjs
+      # Use the same suite selection as local development; Phoenix is opt-in.
+      - name: Run disposable Docker acceptance
+        env:
+          PI_BOX_BASE_IMAGE: pi-box:ci-base
+          PI_BOX_RECOMMENDED_IMAGE: pi-box:ci-recommended
+          PI_BOX_SANDBOX_IMAGE: pi-box:ci-sandbox
+        run: npm run test:integration

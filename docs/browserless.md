@@ -99,13 +99,13 @@ for further options. GUI/browser-UI forwarding is separate and not included.
 
 ## Acceptance tests
 
-After building both Pi image variants, run `npm run test:integration` for the
-host, image smoke, Compose, PostgreSQL and Browserless suites. For Browserless
-alone, run `PI_BOX_RECOMMENDED_IMAGE=pi-box:0.2.0 node tests/browserless-integration.mjs`.
+Run `npm test` for Docker-free checks, then follow the [test guide](../tests/README.md)
+to build images and run `npm run test:integration`. For Browserless alone, run
+`npm run test:integration -- browserless` with a prebuilt recommended Pi image.
 The Browserless test uses disposable containers, volumes and a token, and installs
-a lockfile-pinned client only in disposable Pi. It checks optional/combined
-configuration, health, missing-token rejection, DOM interaction, PNG/PDF output
-and a fresh browser session. It does not use operator data or model credentials.
+a lockfile-pinned client only in disposable Pi. It checks authenticated CDP and
+navigation to a Pi-served page. The separate `config` suite checks optional/combined
+overlay wiring. No operator data or model credentials are used.
 
 CI runs the same acceptance on native Linux AMD64 and ARM64 with Docker Compose
 pinned to **v5.6.0**; the setup action logs the installed version.

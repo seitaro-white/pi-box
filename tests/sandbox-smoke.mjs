@@ -20,7 +20,19 @@ uv --version
 ruff --version
 biome --version
 tmux -V
-node -e 'const s=require(require("node:os").homedir()+"/.pi/agent/settings.json"); if(s.packages.length !== 4) process.exit(1)'
+node --input-type=module -e '
+  import assert from "node:assert/strict";
+  import { readFileSync } from "node:fs";
+  import { homedir } from "node:os";
+  const read = (path) => JSON.parse(readFileSync(path, "utf8"));
+  const manifest = read("/opt/pi/package.json");
+  const expected = Object.keys(manifest.dependencies)
+    .filter((name) => name !== "@earendil-works/pi-coding-agent" && !manifest.piBox.npmTools.includes(name))
+    .map((name) => "/opt/pi/node_modules/" + name);
+  const actual = read(homedir() + "/.pi/agent/settings.json").packages
+    .map((item) => typeof item === "string" ? item : item.source);
+  for (const source of expected) assert(actual.includes(source), "missing managed package " + source);
+'
 test "$(id -un)" = agent
 test "$PWD" = /home/agent/workspace
 test ! -S "\${SSH_AUTH_SOCK:-/no-socket}"

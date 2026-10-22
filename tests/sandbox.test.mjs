@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 test("native environment uses a local kit without host workspace or lifecycle commands", () => {
   const environment = read("sbxenv.yaml");
   assert.match(environment, /^schemaVersion: "1"$/m);
-  assert.match(environment, /^name: pi-box$/m);
+  assert.match(environment, /^name: pi-sandbox$/m);
   assert.match(environment, /^agent: [\w.-]+$/m);
   assert.match(environment, /^kits:\n {2}- \.$/m);
   assert.match(environment, /^ {2}skills: off$/m);

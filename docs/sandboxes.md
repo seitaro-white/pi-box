@@ -32,13 +32,13 @@ sbx env run --detach ./sbxenv.yaml
 
 # Show environments, or stop this one (files/login stay; processes end).
 sbx ls
-sbx stop pi-box
+sbx stop pi-sandbox
 ```
 
-**Already have the older `pi-box`?** Use `--name pi-box-native` before the file
-path on each `sbx env` command, and `sbx stop pi-box-native`. Do not delete the
-old sandbox to try this setup. If your checkout folder isn't `pi-box-public`,
-adjust `agent` in `sbxenv.yaml` to match it first.
+The default name is **`pi-sandbox`**, separate from the regular Compose setup
+and any older `pi-box` sandbox. Existing sandboxes are not renamed or deleted.
+If your checkout folder isn't `pi-box-public`, adjust `agent` in `sbxenv.yaml`
+to match it first; the agent name is separate from the sandbox name.
 
 Routine use does **not** require rebuilding. Image changes need a new sandbox;
 stop/start keeps the existing files and login. See [updates and deletion](#updates-tests-and-deletion)
@@ -126,13 +126,14 @@ Creation builds the local kit automatically, with cached image layers. Review
 and approve the plan. There are no declared host lifecycle commands, workspace
 mounts, or model secrets. The kit keeps the VM running after clients disconnect.
 
-**If an older `pi-box` sandbox already exists**, do not delete it to adopt this
-file. Use a different name for the trial, consistently on each command:
+An older `pi-box` sandbox can coexist with the default `pi-sandbox`; do not
+delete it to adopt this file. For an additional trial, use another name
+consistently on each command:
 
 ```bash
-sbx env plan --name pi-box-native ./sbxenv.yaml
-sbx env create --name pi-box-native ./sbxenv.yaml
-sbx env exec -it --name pi-box-native ./sbxenv.yaml -- bash -l
+sbx env plan --name pi-sandbox-trial ./sbxenv.yaml
+sbx env create --name pi-sandbox-trial ./sbxenv.yaml
+sbx env exec -it --name pi-sandbox-trial ./sbxenv.yaml -- bash -l
 ```
 
 Inside the sandbox:
@@ -160,10 +161,10 @@ sbx env run --detach ./sbxenv.yaml           # create/start without attaching
 sbx env exec -it ./sbxenv.yaml -- bash -l   # plain shell
 sbx env exec -it ./sbxenv.yaml -- pi        # direct Pi invocation
 sbx ls
-sbx stop pi-box                            # keeps files, ends processes
+sbx stop pi-sandbox                        # keeps files, ends processes
 ```
 
-Your aliases can still use `sbx exec -it pi-box bash -l` directly. Manage tmux
+Your aliases can still use `sbx exec -it pi-sandbox bash -l` directly. Manage tmux
 yourself if wanted, e.g. `tmux new-session -A -s dev`. SSH to the hosting Mac to
 use the same commands remotely. The Mac must stay awake/online. Neither stop
 nor reboot preserves live Pi/tmux processes; workspace and login files persist.
@@ -186,7 +187,7 @@ chmod 700 /absolute/path/to/pi-box-data /absolute/path/to/pi-box-data/state
 Create a private `sbxenv.local.yaml` beside `sbxenv.yaml`:
 
 ```yaml
-name: pi-box-shared
+name: pi-sandbox-shared
 workspace: /absolute/path/to/pi-box-data
 env:
   PI_CODING_AGENT_DIR: /absolute/path/to/pi-box-data/state/pi
@@ -242,9 +243,9 @@ its file format are experimental.
 ```bash
 npm test                              # no sbx/KVM/login required
 sbx kit validate .                    # live kit build/validation
-node tests/sandbox-smoke.mjs          # live check of existing pi-box
+node tests/sandbox-smoke.mjs          # live check of existing pi-sandbox
 # Optional restart test ends running sessions:
-SANDBOX_NAME=pi-box-native PI_BOX_SANDBOX_RESTART=1 node tests/sandbox-smoke.mjs
+SANDBOX_NAME=pi-sandbox-trial PI_BOX_SANDBOX_RESTART=1 node tests/sandbox-smoke.mjs
 ```
 
 CI builds/smoke-tests the sandbox Dockerfile with ordinary Docker on AMD64 and

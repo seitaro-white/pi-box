@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
-const name = process.env.SANDBOX_NAME || "pi-box";
+const name = process.env.SANDBOX_NAME || "pi-sandbox";
 const canary = `.pi-box-smoke-${randomUUID()}`;
 function sbx(args) {
   const result = spawnSync("sbx", args, { encoding: "utf8" });

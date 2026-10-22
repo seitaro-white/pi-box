@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: pi-box
+name: pi-sandbox
 # For a local kit, sbx requires agent to match the checkout directory name.
 agent: pi-box-public
 kits:

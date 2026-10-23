@@ -22,7 +22,7 @@ COPY container/gitconfig /etc/gitconfig
 COPY container/init-agent.mjs container/init-git.mjs container/prepare-runtime.mjs /opt/pi/
 RUN chmod 0755 /usr/local/bin/pi-box-entrypoint \
     && install -d -m 0700 -o node -g node /workspace /home/node/.pi /home/node/.pi/agent \
-        /home/node/.config /home/node/.config/git
+        /home/node/.config /home/node/.config/git /home/node/.herdr
 
 # UTF-8 prevents tmux from replacing Unicode UI characters.
 ENV HOME=/home/node \
@@ -72,11 +72,11 @@ RUN node prepare-runtime.mjs recommended \
     && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
-COPY container/init-herdr.mjs /opt/pi/
-COPY container/defaults/herdr.toml /opt/pi/defaults/herdr.toml
-# Durable targets are created at startup, including in pre-existing agent volumes.
-RUN install -d -m 0700 -o node -g node /home/node/.local/state \
-    && ln -s /home/node/.pi/agent/herdr/config /home/node/.config/herdr \
-    && ln -s /home/node/.pi/agent/herdr/state /home/node/.local/state/herdr
+# Docker seeds a fresh Herdr volume from these image-owned defaults.
+RUN install -d -m 0700 -o node -g node /home/node/.herdr/config \
+        /home/node/.herdr/state /home/node/.local/state \
+    && ln -s /home/node/.herdr/config /home/node/.config/herdr \
+    && ln -s /home/node/.herdr/state /home/node/.local/state/herdr
+COPY --chown=node:node --chmod=0600 container/defaults/herdr.toml /home/node/.herdr/config/config.toml
 USER node
 WORKDIR /workspace

@@ -19,7 +19,7 @@ await withComposeProject({ name: "compose" }, async (p) => {
     assert.ok(state.HostConfig.CapDrop.includes("ALL"));
     assert.ok(state.HostConfig.SecurityOpt.includes("no-new-privileges:true"));
     assert.deepEqual(state.HostConfig.PortBindings || {}, {});
-    assert.equal(state.Mounts.length, 3);
+    assert.equal(state.Mounts.length, 4);
     fixture("check-persistence.mjs");
   };
   const refuse = (target, pattern) => {

@@ -11,11 +11,13 @@ The Pi integration lives in the persistent agent volume. Check any existing `~/.
 
 ## Pi-box storage
 
-- `~/.config/herdr` → `~/.pi/agent/herdr/config`
-- `~/.local/state/herdr` → `~/.pi/agent/herdr/state`
-- New config defaults worktrees to `/workspace/.worktrees`.
+The `pi-box-herdr` volume mounts at `~/.herdr` (`HERDR_VOLUME` overrides its name).
 
-Existing config is preserved. Keep worktrees inside mounted storage to survive container replacement.
+- `~/.config/herdr` → `~/.herdr/config`
+- `~/.local/state/herdr` → `~/.herdr/state`
+- Worktree checkouts remain in `/workspace/.worktrees`.
+
+Docker seeds fresh volumes from the image; there is no Herdr startup hook. Existing config is preserved. Keep worktrees inside mounted storage to survive container replacement.
 
 The official installer fetches the latest release at build time. Use `docker compose build --no-cache pi-box` to refresh a cached installation layer.
 

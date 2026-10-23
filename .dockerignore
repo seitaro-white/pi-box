@@ -14,7 +14,6 @@ container/**
 !container/gitconfig
 !container/init-agent.mjs
 !container/init-git.mjs
-!container/init-herdr.mjs
 !container/defaults/
 container/defaults/**
 !container/defaults/herdr.toml

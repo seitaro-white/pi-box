@@ -31,7 +31,8 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   assert.equal(container.HostConfig.NetworkMode, "none");
   assert.deepEqual(container.HostConfig.CapDrop, ["ALL"]);
   assert(container.HostConfig.SecurityOpt.includes("no-new-privileges:true"));
-  assert.equal(container.Mounts.length, 3);
+  assert.equal(container.Mounts.length, 4);
+  assert.equal(container.Mounts.find((mount) => mount.Destination === "/home/node/.herdr")?.Name, p.settings.HERDR_VOLUME);
   tmuxReady();
   // No Herdr server or Pi integration was started by the entrypoint.
   assert.match(exec(["herdr", "status", "server"]), /status: not running/);
@@ -82,5 +83,10 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   exec(["herdr", "integration", "uninstall", "pi"]);
   shell("test ! -e ~/.pi/agent/extensions/herdr-agent-state.ts");
   exec(["herdr", "server", "stop"]);
+  // Populated volumes are operator-owned; missing config is not reseeded at startup.
+  shell("rm ~/.config/herdr/config.toml");
+  compose(["up", "-d", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "60"]);
+  shell("test ! -e ~/.config/herdr/config.toml");
+  tmuxReady();
   console.log("PASS: Herdr security, Pi extension, persistent config/layout/state, worktree path and tmux coexistence. No model calls.");
 });

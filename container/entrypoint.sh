@@ -5,7 +5,4 @@ umask 077
 # Defaults live outside the mounted volume; existing operator config is retained.
 node /opt/pi/init-git.mjs
 node /opt/pi/init-agent.mjs
-if [ -x /usr/local/bin/herdr ]; then
-    node /opt/pi/init-herdr.mjs
-fi
 exec "$@"

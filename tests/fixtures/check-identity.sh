@@ -28,10 +28,11 @@ if [ "$EXPECTED_PROFILE" = recommended ]; then
     herdr --version
     test "$(stat -c %u /usr/local/bin/herdr)" = 0
     test ! -w /usr/local/bin/herdr
-    test "$(readlink /home/node/.config/herdr)" = /home/node/.pi/agent/herdr/config
-    test "$(readlink /home/node/.local/state/herdr)" = /home/node/.pi/agent/herdr/state
-    for path in herdr herdr/config herdr/state; do
-        test "$(stat -c %a "/home/node/.pi/agent/$path")" = 700
+    test "$(readlink /home/node/.config/herdr)" = /home/node/.herdr/config
+    test "$(readlink /home/node/.local/state/herdr)" = /home/node/.herdr/state
+    for path in /home/node/.herdr /home/node/.herdr/config /home/node/.herdr/state; do
+        test "$(stat -c %a "$path")" = 700
+        test -w "$path"
     done
     test "$(stat -c %a /home/node/.config/herdr/config.toml)" = 600
 else
@@ -39,7 +40,7 @@ else
         echo "Herdr must not be installed in the base image" >&2
         exit 1
     fi
-    test ! -e /home/node/.pi/agent/herdr
+    test ! -e /home/node/.herdr/config
 fi
 # Integration installation is an operator action, not an entrypoint side effect.
 test ! -e /home/node/.pi/agent/extensions/herdr-agent-state.ts

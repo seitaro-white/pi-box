@@ -15,6 +15,7 @@ services:
       - workspace:/workspace
       - agent:/home/node/.pi/agent
       - git:/home/node/.config/git
+      - herdr:/home/node/.herdr
     healthcheck:
       test: ["CMD", "tmux", "has-session", "-t", "=shell"]
       interval: 1s
@@ -30,3 +31,5 @@ volumes:
     name: ${AGENT_VOLUME:-pi-box-agent}
   git:
     name: ${GIT_VOLUME:-pi-box-git}
+  herdr:
+    name: ${HERDR_VOLUME:-pi-box-herdr}

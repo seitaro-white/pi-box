@@ -48,7 +48,7 @@ docker compose exec pi-box tmux attach-session -t '=shell'
 pi
 ```
 
-There are also convenience targets in `Makefile`. The workspace, Pi settings and Git credentials are stored in persistent volumes and survive image rebuilds and container replacement
+There are also convenience targets in `Makefile`. The workspace, Pi settings, Git credentials and Herdr state are stored in persistent volumes and survive image rebuilds and container replacement
 
 
 ## Architecture
@@ -72,6 +72,7 @@ flowchart TD
         workspace["Workspace: /workspace"]
         agent["Pi state: /home/node/.pi/agent"]
         git["Git: /home/node/.config/git"]
+        herdr["Herdr: /home/node/.herdr"]
         data["Optional PostgreSQL data"]
         traces["Optional Phoenix SQLite traces"]
     end
@@ -79,12 +80,13 @@ flowchart TD
     pi --> workspace
     pi --> agent
     pi --> git
+    pi --> herdr
     db --> data
     phoenix --> traces
 
     classDef core fill:#dbeafe,stroke:#2563eb,color:#172554
     classDef optional fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-dasharray:5 5
-    class pi,workspace,agent,git core
+    class pi,workspace,agent,git,herdr core
     class db,data,browser,phoenix,traces optional
 ```
 

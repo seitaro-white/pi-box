@@ -3,11 +3,16 @@
 Included in the `recommended` image and launched manually; tmux remains the default.
 
 ```sh
-docker compose exec pi-box herdr integration install pi
 docker compose exec -w /workspace/my-project pi-box herdr
 ```
 
-The Pi integration lives in the persistent agent volume. Check any existing `~/.pi/agent/extensions/herdr-agent-state.ts` before installing or refreshing it; image rebuilds do not update that file.
+The [`@muzi3/herdr-agent-state`](https://pi.dev/packages/%40muzi3/herdr-agent-state) Pi extension is bundled automatically; no separate integration install is needed.
+
+If you previously ran `herdr integration install pi`, remove that manual copy once to avoid loading two reporters:
+
+```sh
+docker compose exec pi-box herdr integration uninstall pi
+```
 
 ## Pi-box storage
 

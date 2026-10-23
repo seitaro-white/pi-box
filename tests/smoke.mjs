@@ -168,6 +168,7 @@ async function runSmoke() {
     ]);
     fixture("check-extensions.mjs", [
       "PI_OFFLINE=1",
+      `EXPECTED_PROFILE=${profile}`,
       `EXPECTED_MANIFEST_JSON=${JSON.stringify(manifest)}`,
     ]);
     fixture("check-npm-cache.sh");

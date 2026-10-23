@@ -100,8 +100,8 @@ The default image includes:
 - **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
 - **Herdr** (recommended image) — optional, manually launched terminal dashboard for interactive Pi sessions, agent status and Git worktrees. Run `docker compose exec pi-box herdr` from another terminal; tmux remains the default. See the [Herdr guide](docs/herdr.md) for Pi integration, persistent state and usage.
-- **Standard development tools:** Bash, Git, ripgrep, fd.
-- **TUI navigation tools:** micro (file editor), bat (file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
+- **Standard development tools:** Bash, Git, curl, ripgrep, fd (`fdfind` on Debian).
+- **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
 - **Python, uv and Ruff**
 - **Node.js, npm and Biome**
@@ -135,6 +135,8 @@ The default build target is `recommended`. A stripped-down `base` target include
 TARGET=base
 IMAGE=pi-box:0.2.0-base
 ```
+
+Runtime defaults follow the sandbox where possible: Pi uses `~/.pi/agent`, checks for updates normally, and the pager is `batcat`. Compose keeps install telemetry disabled and redirects later uv Python/tool installs into the persistent agent volume; these installs survive container replacement.
 
 ### Git setup
 

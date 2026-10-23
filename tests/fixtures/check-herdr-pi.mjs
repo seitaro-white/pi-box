@@ -3,6 +3,7 @@
 // be harmless for ordinary Pi sessions too. Interactive reporting is manual.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   createAgentSession,
@@ -11,7 +12,7 @@ import {
 } from "/opt/pi/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
 
 assert.equal(process.env.HERDR_ENV, undefined);
-const agentDir = process.env.PI_CODING_AGENT_DIR;
+const agentDir = join(homedir(), ".pi", "agent");
 const extension = join(agentDir, "extensions/herdr-agent-state.ts");
 assert(existsSync(extension));
 const loader = new DefaultResourceLoader({ cwd: "/workspace", agentDir });

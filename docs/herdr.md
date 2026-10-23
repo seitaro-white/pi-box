@@ -10,7 +10,7 @@ Use a separate host terminal, rather than nesting Herdr in your current tmux cli
 
 ```sh
 docker compose exec pi-box sh -c '
-  file="$PI_CODING_AGENT_DIR/extensions/herdr-agent-state.ts"
+  file="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/extensions/herdr-agent-state.ts"
   if [ -e "$file" ] || [ -L "$file" ]; then
     printf "Already present; inspect before replacing: %s\n" "$file"
   else

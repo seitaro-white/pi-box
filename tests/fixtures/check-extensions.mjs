@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
@@ -17,7 +17,7 @@ import {
   SessionManager,
 } from "/opt/pi/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
 
-const profile = process.env.PI_BOX_PROFILE;
+const profile = process.env.EXPECTED_PROFILE;
 const piPackage = "@earendil-works/pi-coding-agent";
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
@@ -36,7 +36,7 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   );
 
   // The image must not seed policy files before upstream extensions initialize.
-  const agentDir = process.env.PI_CODING_AGENT_DIR;
+  const agentDir = join(homedir(), ".pi", "agent");
   for (const file of [
     "extensions/subagent/config.json",
     "web-search.json",

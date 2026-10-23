@@ -2,10 +2,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 
 assert.equal(
-  process.env.PI_CODING_AGENT_DIR,
-  "/home/node/.pi/agent",
+  homedir(),
+  "/home/node",
   "fixture must run inside the test image",
 );
 const cwd = "/workspace/repo";

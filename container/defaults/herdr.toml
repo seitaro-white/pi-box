@@ -1,0 +1,3 @@
+# Worktree checkouts must survive container replacement.
+[worktrees]
+directory = "/workspace/.worktrees"

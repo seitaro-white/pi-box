@@ -12,6 +12,7 @@ const suites = {
     PI_BOX_PROFILE: "recommended",
     PI_BOX_IMAGE: process.env.PI_BOX_RECOMMENDED_IMAGE || "pi-box:0.2.0",
   }],
+  herdr: ["herdr-integration.mjs"],
   sandbox: ["sandbox-image.mjs"],
   compose: ["compose.mjs"],
   postgres: ["postgres-integration.mjs"],

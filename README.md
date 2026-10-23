@@ -99,6 +99,7 @@ The default image includes:
 
 - **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
+- **Herdr** (recommended image) — optional, manually launched terminal dashboard for interactive Pi sessions, agent status and Git worktrees. Run `docker compose exec pi-box herdr` from another terminal; tmux remains the default. See the [Herdr guide](docs/herdr.md) for Pi integration, persistent state and usage.
 - **Standard development tools:** Bash, Git, ripgrep, fd.
 - **TUI navigation tools:** micro (file editor), bat (file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
@@ -128,7 +129,7 @@ While I do have a set of development skills I use frequently, I'm of the opinion
 
 ### Base image
 
-The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
+The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
 
 ```dotenv
 TARGET=base

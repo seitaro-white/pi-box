@@ -44,6 +44,23 @@ WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/pi-box-entrypoint"]
 CMD ["tmux", "-D"]
 
+# Verified upstream binary; download tooling never reaches the runtime image.
+FROM common AS herdr-download
+USER root
+ARG TARGETARCH
+ARG HERDR_VERSION=0.9.5
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && case "$TARGETARCH" in \
+        arm64) asset=aarch64; sha256=17d7536f2da50859523680ef279dffcac8e4a235f4e46fe8da6c2ec44141897c ;; \
+        amd64) asset=x86_64; sha256=14d9e8bc8b4a9e0118d77c32266f76d461f09b40342eb23752960bd89f59929d ;; \
+        *) echo "Unsupported Herdr architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && curl --fail --location --silent --show-error --retry 3 \
+        "https://github.com/herdrdev/herdr/releases/download/v${HERDR_VERSION}/herdr-linux-${asset}" -o /tmp/herdr \
+    && printf '%s  %s\n' "$sha256" /tmp/herdr | sha256sum --check - \
+    && install -m 0755 /tmp/herdr /usr/local/bin/herdr
+
 # Root's build-time npm cache must not touch the runtime user's home directory.
 # The base lockfile describes only Pi. Derive its manifest from the same source
 # used by recommended; npm ci fails if the derived manifest and lock disagree.
@@ -75,6 +92,13 @@ RUN node prepare-runtime.mjs recommended \
     && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
+COPY --from=herdr-download /usr/local/bin/herdr /usr/local/bin/herdr
+COPY container/init-herdr.mjs /opt/pi/
+COPY container/defaults/herdr.toml /opt/pi/defaults/herdr.toml
+# Durable targets are created at startup, including in pre-existing agent volumes.
+RUN install -d -m 0700 -o node -g node /home/node/.local/state \
+    && ln -s /home/node/.pi/agent/herdr/config /home/node/.config/herdr \
+    && ln -s /home/node/.pi/agent/herdr/state /home/node/.local/state/herdr
 ENV PI_BOX_PROFILE=recommended
 USER node
 WORKDIR /workspace

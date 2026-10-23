@@ -21,6 +21,25 @@ if command -v postgres >/dev/null; then
     echo "PostgreSQL server must not be installed in the Pi image" >&2
     exit 1
 fi
+if [ "$PI_BOX_PROFILE" = recommended ]; then
+    test "$(herdr --version)" = 'herdr 0.9.5'
+    test "$(stat -c %u /usr/local/bin/herdr)" = 0
+    test ! -w /usr/local/bin/herdr
+    test "$(readlink /home/node/.config/herdr)" = /home/node/.pi/agent/herdr/config
+    test "$(readlink /home/node/.local/state/herdr)" = /home/node/.pi/agent/herdr/state
+    for path in herdr herdr/config herdr/state; do
+        test "$(stat -c %a "/home/node/.pi/agent/$path")" = 700
+    done
+    test "$(stat -c %a /home/node/.config/herdr/config.toml)" = 600
+else
+    if command -v herdr >/dev/null; then
+        echo "Herdr must not be installed in the base image" >&2
+        exit 1
+    fi
+    test ! -e /home/node/.pi/agent/herdr
+fi
+# Integration installation is an operator action, not an entrypoint side effect.
+test ! -e /home/node/.pi/agent/extensions/herdr-agent-state.ts
 test ! -w /opt/pi
 test "$(stat -c %a /home/node/.pi/agent)" = 700
 test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600

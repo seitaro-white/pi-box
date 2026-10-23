@@ -115,6 +115,7 @@ The default image includes:
     - **`pi-web-access`** — simple web access/search - useful to have this as a capability separate from any given model provider.
     - **`@narumitw/pi-lsp`** — Gives Pi access to the Ruff & Biome toolchain - you can catch a surprising number of issues in AI-generated code with good old-fashioned linting before you even get to agent reviews.
     - **`@narumitw/pi-usage`** — Usage dashboard for subscription based coding plans.
+    - **`@muzi3/herdr-agent-state`** — Reports Pi status and session identity to Herdr; inactive outside Herdr.
 
 - **Sidecars**
     - **PostgreSQL Server** - Optional local database server intended for development/testing, not production.

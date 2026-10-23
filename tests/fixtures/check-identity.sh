@@ -42,7 +42,7 @@ else
     fi
     test ! -e /home/node/.herdr/config
 fi
-# Integration installation is an operator action, not an entrypoint side effect.
+# The bundled npm extension needs no separate global integration file.
 test ! -e /home/node/.pi/agent/extensions/herdr-agent-state.ts
 test ! -w /opt/pi
 test "$(stat -c %a /home/node/.pi/agent)" = 700

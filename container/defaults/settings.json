@@ -3,6 +3,7 @@
     "/opt/pi/node_modules/pi-subagents",
     "/opt/pi/node_modules/pi-web-access",
     "/opt/pi/node_modules/@narumitw/pi-usage",
-    "/opt/pi/node_modules/@narumitw/pi-lsp"
+    "/opt/pi/node_modules/@narumitw/pi-lsp",
+    "/opt/pi/node_modules/@muzi3/herdr-agent-state"
   ]
 }

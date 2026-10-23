@@ -34,7 +34,7 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   assert.equal(container.Mounts.length, 4);
   assert.equal(container.Mounts.find((mount) => mount.Destination === "/home/node/.herdr")?.Name, p.settings.HERDR_VOLUME);
   tmuxReady();
-  // No Herdr server or Pi integration was started by the entrypoint.
+  // Herdr stays stopped; the Pi integration is bundled, not installed globally.
   assert.match(exec(["herdr", "status", "server"]), /status: not running/);
   shell("test ! -e ~/.pi/agent/extensions/herdr-agent-state.ts");
   shell(`
@@ -59,7 +59,6 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   assert(worktreePane, "new worktree workspace is rooted in persistent storage");
   api("worktree", "remove", "--workspace", worktreePane.workspace_id);
   assert.equal(shell("git -C /workspace/herdr-repo branch --list feature/smoke"), "feature/smoke");
-  exec(["herdr", "integration", "install", "pi"]);
   exec(["env", "PI_OFFLINE=1", "node", "--input-type=module"], {
     input: readFileSync(new URL("./fixtures/check-herdr-pi.mjs", import.meta.url), "utf8"),
   });
@@ -76,12 +75,12 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   assert.match(exec(["herdr", "status", "server"]), /status: not running/);
   assert.equal(shell("sha256sum ~/.config/herdr/config.toml"), savedConfig);
   assert.equal(shell("cat ~/.local/state/herdr/canary"), "durable-state");
-  shell("test -s ~/.pi/agent/extensions/herdr-agent-state.ts");
+  exec(["env", "PI_OFFLINE=1", "node", "--input-type=module"], {
+    input: readFileSync(new URL("./fixtures/check-herdr-pi.mjs", import.meta.url), "utf8"),
+  });
   await startServer();
   assert(api("workspace", "list").workspaces.some((workspace) => workspace.label === "persistent-check"));
   tmuxReady();
-  exec(["herdr", "integration", "uninstall", "pi"]);
-  shell("test ! -e ~/.pi/agent/extensions/herdr-agent-state.ts");
   exec(["herdr", "server", "stop"]);
   // Populated volumes are operator-owned; missing config is not reseeded at startup.
   shell("rm ~/.config/herdr/config.toml");

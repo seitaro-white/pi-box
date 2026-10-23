@@ -24,6 +24,7 @@ async function runSmoke() {
     { name: `${name}-workspace`, path: "/workspace" },
     { name: `${name}-agent`, path: "/home/node/.pi/agent" },
     { name: `${name}-git`, path: "/home/node/.config/git" },
+    { name: `${name}-herdr`, path: "/home/node/.herdr" },
   ];
   const label = `io.pi-box.smoke=${name}`;
   const security = ["--cap-drop=ALL", "--security-opt=no-new-privileges"];
@@ -168,6 +169,7 @@ async function runSmoke() {
     ]);
     fixture("check-extensions.mjs", [
       "PI_OFFLINE=1",
+      `EXPECTED_PROFILE=${profile}`,
       `EXPECTED_MANIFEST_JSON=${JSON.stringify(manifest)}`,
     ]);
     fixture("check-npm-cache.sh");

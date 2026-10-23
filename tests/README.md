@@ -16,11 +16,12 @@ npm run test:integration
 # Run selected checks, or explicitly include Phoenix.
 npm run test:integration -- config
 npm run test:integration -- compose postgres
+npm run test:integration -- herdr  # Persistent Herdr + offline Pi extension loading
 npm run test:integration -- phoenix
 npm run test:integration -- --all
 ```
 
-The default selection is `config base recommended sandbox compose postgres browserless`. Host tests run separately; acceptance does not repeat them. CI builds all three images and uses this same default selection on native AMD64/ARM64 runners.
+The default selection is `config base recommended herdr sandbox compose postgres browserless`. Host tests run separately; acceptance does not repeat them. CI builds all three images and uses this same default selection on native AMD64/ARM64 runners.
 
 Override prebuilt image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAGE` and `PI_BOX_SANDBOX_IMAGE`. Individual `smoke.mjs` runs also accept `PI_BOX_PROFILE` and `PI_BOX_IMAGE`. Sidecar acceptance may pull the pinned upstream images; Browserless installs its lockfile-pinned client in disposable Pi storage, and Phoenix explicitly installs the documented `pi-otel` package there.
 
@@ -30,6 +31,7 @@ Override prebuilt image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAG
 - `integration.mjs`: selects acceptance suites; no image building.
 - `compose-configuration.mjs`: resolves all eight overlay selections and checks wiring, optionality, storage names and network exposure. Does not start containers.
 - `smoke.mjs`: image identity, writable/private state, pinned runtime, extension loading and basic LSP connectivity for base/recommended images.
+- `herdr-integration.mjs`: offline Pi extension loading, a dedicated Herdr volume seeded without a startup hook, persistent config/layout/state, worktree location and tmux coexistence. Interactive status and conversation resume remain manual checks.
 - `compose.mjs`: real Make/Compose startup, idempotence, replacement refusal and persistence of workspace, Pi state and Git credentials. This is the authoritative lifecycle test.
 - `postgres-integration.mjs`: a Pi-side SQL connection and a stored value surviving database recreation.
 - `browserless-integration.mjs`: authenticated CDP and navigation from the browser to a Pi-served page.

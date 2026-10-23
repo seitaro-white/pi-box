@@ -27,6 +27,7 @@ export async function withComposeProject({ name, overlays = [], settings = {} },
     WORKSPACE_VOLUME: `${project}-workspace`,
     AGENT_VOLUME: `${project}-agent`,
     GIT_VOLUME: `${project}-git`,
+    HERDR_VOLUME: `${project}-herdr`,
   };
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
@@ -64,7 +65,7 @@ export async function withComposeProject({ name, overlays = [], settings = {} },
   let ready = false;
   function cleanup(failed) {
     if (failed && process.env.PI_BOX_KEEP_TEST_RESOURCES === "1") {
-      console.error(`Retained failed project ${project}: ${directory}; volumes ${localSettings.WORKSPACE_VOLUME}, ${localSettings.AGENT_VOLUME}, ${localSettings.GIT_VOLUME}; sidecar resources use project ${project}.`);
+      console.error(`Retained failed project ${project}: ${directory}; volumes ${localSettings.WORKSPACE_VOLUME}, ${localSettings.AGENT_VOLUME}, ${localSettings.GIT_VOLUME}, ${localSettings.HERDR_VOLUME}; sidecar resources use project ${project}.`);
       return;
     }
     if (ready) compose(["down", "--volumes", "--remove-orphans", "--timeout", "10"], { timeout: 60_000 });

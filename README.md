@@ -48,7 +48,7 @@ docker compose exec pi-box tmux attach-session -t '=shell'
 pi
 ```
 
-There are also convenience targets in `Makefile`. The workspace, Pi settings and Git credentials are stored in persistent volumes and survive image rebuilds and container replacement
+There are also convenience targets in `Makefile`. The workspace, Pi settings, Git credentials and Herdr state are stored in persistent volumes and survive image rebuilds and container replacement
 
 
 ## Architecture
@@ -72,6 +72,7 @@ flowchart TD
         workspace["Workspace: /workspace"]
         agent["Pi state: /home/node/.pi/agent"]
         git["Git: /home/node/.config/git"]
+        herdr["Herdr: /home/node/.herdr"]
         data["Optional PostgreSQL data"]
         traces["Optional Phoenix SQLite traces"]
     end
@@ -79,12 +80,13 @@ flowchart TD
     pi --> workspace
     pi --> agent
     pi --> git
+    pi --> herdr
     db --> data
     phoenix --> traces
 
     classDef core fill:#dbeafe,stroke:#2563eb,color:#172554
     classDef optional fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-dasharray:5 5
-    class pi,workspace,agent,git core
+    class pi,workspace,agent,git,herdr core
     class db,data,browser,phoenix,traces optional
 ```
 
@@ -99,8 +101,9 @@ The default image includes:
 
 - **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
-- **Standard development tools:** Bash, Git, ripgrep, fd.
-- **TUI navigation tools:** micro (file editor), bat (file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
+- **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager. See [Pi-box setup and storage](docs/herdr.md).
+- **Standard development tools:** Bash, Git, curl, ripgrep, fd (`fdfind` on Debian).
+- **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
 - **Python, uv and Ruff**
 - **Node.js, npm and Biome**
@@ -128,12 +131,14 @@ While I do have a set of development skills I use frequently, I'm of the opinion
 
 ### Base image
 
-The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
+The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
 
 ```dotenv
 TARGET=base
 IMAGE=pi-box:0.2.0-base
 ```
+
+Runtime defaults follow the sandbox where possible: Pi uses `~/.pi/agent`, checks for updates normally, and the pager is `batcat`. Compose keeps install telemetry disabled and redirects later uv Python/tool installs into the persistent agent volume; these installs survive container replacement.
 
 ### Git setup
 

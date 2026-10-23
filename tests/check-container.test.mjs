@@ -10,6 +10,7 @@ const volumes = [
   { source: "workspace", target: "/workspace" },
   { source: "agent", target: "/home/node/.pi/agent" },
   { source: "git", target: "/home/node/.config/git" },
+  { source: "herdr", target: "/home/node/.herdr" },
 ];
 
 function preflightFixture() {
@@ -109,6 +110,12 @@ console.log(typeof output === "string" ? output : JSON.stringify(output));
 for (const [scenario, change, error] of [
   ["fresh", (fixture) => { fixture.names = []; fixture.owned = []; }],
   ["normal", () => {}],
+  ["add Herdr volume", (fixture) => { fixture.existing[0].Mounts.pop(); }],
+  [
+    "unmounted Herdr data",
+    (fixture) => { fixture.existing[0].Mounts.pop(); fixture.unsafePath = ".herdr"; },
+    /non-persistent.*herdr/,
+  ],
   [
     "standalone",
     (fixture) => { fixture.existing[0].Config.Labels = {}; },
@@ -122,11 +129,12 @@ for (const [scenario, change, error] of [
   ...[".gitconfig", ".ssh", ".git-credentials"].map((path) => [
     `non-persistent ${path}`, (fixture) => { fixture.unsafePath = path; }, /non-persistent/,
   ]),
-  ["missing mount", (fixture) => { fixture.existing[0].Mounts.pop(); }, /Unexpected mounts/],
+  ["missing mount", (fixture) => { fixture.existing[0].Mounts.splice(1, 1); }, /Unexpected mounts/],
   ["readonly mount", (fixture) => { fixture.existing[0].Mounts[0].RW = false; }, /Unexpected mounts/],
   ["bind mount", (fixture) => { fixture.existing[0].Mounts[0].Type = "bind"; }, /Unexpected mounts/],
   ["stopped", (fixture) => { fixture.existing[0].State.Running = false; }, /Start .* first/],
   ["shared Git volume", (fixture) => { fixture.users["volume=pi-box-git"] = ["other"]; }, /in use by other/],
+  ["shared Herdr volume", (fixture) => { fixture.users["volume=pi-box-herdr"] = ["other"]; }, /in use by other/],
   [
     "foreign project",
     (fixture) => { fixture.existing[0].Config.Labels["com.docker.compose.project"] = "other"; },
@@ -142,7 +150,7 @@ for (const [scenario, change, error] of [
   [
     "invalid Compose mounts",
     (fixture) => { fixture.config.services["pi-box"].volumes = []; },
-    /three writable named volumes/,
+    /four writable named volumes/,
   ],
   [
     "duplicate volume",
@@ -162,7 +170,7 @@ for (const [scenario, change, error] of [
       assert.ok(owned?.includes("--all"), "check stopped project containers too");
       assert.ok(owned.includes("label=com.docker.compose.project=pi-box"));
       assert.ok(owned.includes("label=com.docker.compose.config-hash"));
-      assert.equal(calls.some((args) => args[0] === "exec"), scenario === "normal");
+      assert.equal(calls.some((args) => args[0] === "exec"), scenario !== "fresh");
       for (const { source } of volumes) {
         assert.ok(calls.some((args) => args[0] === "ps" && args.includes(`volume=pi-box-${source}`)));
       }

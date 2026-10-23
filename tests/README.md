@@ -31,7 +31,7 @@ Override prebuilt image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAG
 - `integration.mjs`: selects acceptance suites; no image building.
 - `compose-configuration.mjs`: resolves all eight overlay selections and checks wiring, optionality, storage names and network exposure. Does not start containers.
 - `smoke.mjs`: image identity, writable/private state, pinned runtime, extension loading and basic LSP connectivity for base/recommended images.
-- `herdr-integration.mjs`: verified recommended-image Herdr under existing security restrictions, offline Pi extension loading outside Herdr, private persistent config/state and layout restoration across disposable replacement, and a persistent worktree path. No providers or credentials. Real interactive Pi status, detach/reattach and conversation resume remain manual checks; see [Herdr](../docs/herdr.md).
+- `herdr-integration.mjs`: offline Pi extension loading, persistent Herdr config/layout/state, worktree location and tmux coexistence. Interactive status and conversation resume remain manual checks.
 - `compose.mjs`: real Make/Compose startup, idempotence, replacement refusal and persistence of workspace, Pi state and Git credentials. This is the authoritative lifecycle test.
 - `postgres-integration.mjs`: a Pi-side SQL connection and a stored value surviving database recreation.
 - `browserless-integration.mjs`: authenticated CDP and navigation from the browser to a Pi-served page.

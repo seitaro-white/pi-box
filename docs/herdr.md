@@ -1,6 +1,6 @@
 # Herdr (recommended image)
 
-[Herdr](https://herdr.dev/) is an agent-aware terminal multiplexer. Pi-box includes a checksum-verified **v0.9.5** binary in the `recommended` image, not `base` or the separate Docker Sandboxes image. It runs inside Pi-box as `node`, under the same restrictions as Pi. No sidecar, host installation, cloud account, web service or published port is needed.
+[Herdr](https://herdr.dev/) is an agent-aware terminal multiplexer. Pi-box uses Herdr's official installer to fetch its latest stable release when the installation layer is rebuilt in the `recommended` image, not `base` or the separate Docker Sandboxes image. It runs inside Pi-box as `node`, under the same restrictions as Pi. No sidecar, host installation, cloud account, web service or published port is needed.
 
 Herdr is **optional and manually launched**. The container still starts tmux, with its existing healthcheck and attach workflow. Installing the image does not move existing tmux sessions, start Herdr or start agents.
 
@@ -67,9 +67,9 @@ Use your existing secure SSH route to the Pi-box host (for example via Tailscale
 
 ## Updates and rollback
 
-The binary is root-owned and image-pinned. Update `HERDR_VERSION` and **both** Linux SHA-256 values in `Dockerfile` together, verify against upstream release metadata, rebuild, and rerun disposable acceptance. Do not use `herdr update` in a running container. A new image does not update the extension in the agent volume: inspect the existing file and deliberately refresh with `herdr integration install pi` after compatibility checks. `herdr integration status` reports installation status.
+The binary is root-owned and installed using the official installer, which selects the architecture and verifies the release checksum. No version or checksum is frozen in this repo. Docker may reuse the installation layer: to fetch the current release, run `docker compose build --no-cache pi-box`, then rerun disposable acceptance before replacing the live container. `herdr --version` reports what the image contains. Do not use `herdr update` in a running container. A new image does not update the extension in the agent volume: inspect the existing file and deliberately refresh with `herdr integration install pi` after compatibility checks. `herdr integration status` reports installation status.
 
-Upstream enables version checks and downloads updated agent-detection manifests by default. A pinned executable does **not** pin those remote detection rules. If you prefer no background update requests, add this to the operator-owned `~/.config/herdr/config.toml` and restart Herdr deliberately when convenient:
+Upstream enables version checks and downloads updated agent-detection manifests by default. Those checks are independent of the image's installed binary. If you prefer no background update requests, add this to the operator-owned `~/.config/herdr/config.toml` and restart Herdr deliberately when convenient:
 
 ```toml
 [update]

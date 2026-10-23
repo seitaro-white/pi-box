@@ -22,7 +22,8 @@ if command -v postgres >/dev/null; then
     exit 1
 fi
 if [ "$PI_BOX_PROFILE" = recommended ]; then
-    test "$(herdr --version)" = 'herdr 0.9.5'
+    herdr --version
+    command -v curl >/dev/null
     test "$(stat -c %u /usr/local/bin/herdr)" = 0
     test ! -w /usr/local/bin/herdr
     test "$(readlink /home/node/.config/herdr)" = /home/node/.pi/agent/herdr/config

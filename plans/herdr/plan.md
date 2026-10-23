@@ -1,5 +1,7 @@
 # Add Herdr to Pi-box
 
+> **Post-review scope update:** The operator rejected freezing Herdr's version. Use the official latest-stable installer in the recommended image with curl available, rather than the pinned download stage/checksums proposed below. Test functionality, not a fixed version string, and document Docker's installation-layer caching. Persistence, explicit Pi integration and tmux behaviour remain unchanged. The original approved plan below is retained as the design record; this update supersedes its Herdr pinning and build-only-download-tool decisions.
+
 ## User goal and agreed constraints
 
 Provide a lightweight, persistent Herdr installation inside the main Pi-box container for managing new interactive Pi sessions. The operator explicitly chose **persistent integration**, not a disposable-only installation.

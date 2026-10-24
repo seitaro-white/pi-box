@@ -26,6 +26,7 @@ test "$(uv tool dir)" = /home/node/.pi/agent/uv-tools
 test "$(uv tool dir --bin)" = /home/node/.pi/agent/bin
 if [ "$EXPECTED_PROFILE" = recommended ]; then
     herdr --version
+    test -s /home/node/.pi/agent/extensions/herdr-agent-state.ts
     test "$(stat -c %u /usr/local/bin/herdr)" = 0
     test ! -w /usr/local/bin/herdr
     test "$(readlink /home/node/.config/herdr)" = /home/node/.herdr/config
@@ -41,9 +42,8 @@ else
         exit 1
     fi
     test ! -e /home/node/.herdr/config
+    test ! -e /home/node/.pi/agent/extensions/herdr-agent-state.ts
 fi
-# The bundled npm extension needs no separate global integration file.
-test ! -e /home/node/.pi/agent/extensions/herdr-agent-state.ts
 test ! -w /opt/pi
 test "$(stat -c %a /home/node/.pi/agent)" = 700
 test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600

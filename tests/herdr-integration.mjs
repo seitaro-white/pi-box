@@ -34,9 +34,9 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   assert.equal(container.Mounts.length, 4);
   assert.equal(container.Mounts.find((mount) => mount.Destination === "/home/node/.herdr")?.Name, p.settings.HERDR_VOLUME);
   tmuxReady();
-  // Herdr stays stopped; the Pi integration is bundled, not installed globally.
+  // Startup installs the official reporter without starting the Herdr server.
   assert.match(exec(["herdr", "status", "server"]), /status: not running/);
-  shell("test ! -e ~/.pi/agent/extensions/herdr-agent-state.ts");
+  shell("test -s ~/.pi/agent/extensions/herdr-agent-state.ts");
   shell(`
     printf '\\n# operator canary\\n[update]\\nversion_check = false\\nmanifest_check = false\\n' >> ~/.config/herdr/config.toml
     printf durable-state > ~/.local/state/herdr/canary
@@ -70,7 +70,10 @@ await withComposeProject({ name: "herdr" }, async (p) => {
   }
   shell("test -s ~/.config/herdr/session.json");
   tmuxReady();
+  // A replacement refreshes the managed integration even in an existing volume.
+  shell("printf stale > ~/.pi/agent/extensions/herdr-agent-state.ts");
   compose(["up", "-d", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "60"]);
+  assert.match(shell("head -1 ~/.pi/agent/extensions/herdr-agent-state.ts"), /installed by herdr/);
   tmuxReady();
   assert.match(exec(["herdr", "status", "server"]), /status: not running/);
   assert.equal(shell("sha256sum ~/.config/herdr/config.toml"), savedConfig);

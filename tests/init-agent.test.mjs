@@ -140,6 +140,18 @@ describe("agent initialization", () => {
     ]);
   });
 
+  it("removes the retired image-owned Herdr npm reporter on upgrade", (t) => {
+    const state = agentState(t);
+    const retired = "/opt/pi/node_modules/@muzi3/herdr-agent-state";
+    state.writeJson("pi-box-packages.json", { version: 1, packages: [retired] });
+    state.writeJson("settings.json", { packages: [retired, operatorPackage] });
+
+    state.run();
+
+    assert.deepEqual(state.json("settings.json").packages, [operatorPackage, ...defaults]);
+    assert(!defaults.includes(retired));
+  });
+
   it("preserves unowned image paths when no ownership file exists", (t) => {
     const state = agentState(t);
     const packages = [

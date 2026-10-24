@@ -10,6 +10,12 @@ At container startup, Pi-box runs the official `herdr integration install pi` af
 
 The separately published `@muzi3/herdr-agent-state` npm package is no longer bundled. Startup removes its old image-owned package reference from existing Pi settings through the normal package ownership reconciliation. Operator-installed npm/git copies are not removed automatically: remove those yourself to avoid duplicate reporters. No manual uninstall is needed for a previous official integration; the installer refreshes it.
 
+## Pi skill
+
+The recommended image exposes Herdr's official skill at `~/.agents/skills/herdr/SKILL.md`, generated from `herdr --skill` during the build so it matches the installed CLI. This image-owned location is outside the persistent Pi volume, so existing volumes receive the skill on container replacement too. Restart Pi or use `/reload` to discover it.
+
+Ask Pi to use Herdr, or invoke `/skill:herdr` explicitly. The skill intentionally activates only when you mention Herdr or explicitly request its use, not merely because a task might benefit from parallel work. It requires Pi to be running in a Herdr-managed pane (`HERDR_ENV=1`); it teaches Pi to use the CLI through bash rather than registering new tools.
+
 ## Agents, panes, and pi-subagents
 
 Herdr is a terminal runtime and orchestration CLI, not a replacement for `pi-subagents`. An agent can use its shell tool to split panes, start another Pi (or another supported agent), submit prompts, wait for lifecycle state, and read terminal output. See [Agent automation](https://herdr.dev/docs/agent-automation/). The status integration alone does not register orchestration tools in Pi or automatically delegate work.

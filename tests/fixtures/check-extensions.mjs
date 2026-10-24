@@ -59,6 +59,22 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   const loader = new DefaultResourceLoader({ cwd: "/workspace", agentDir });
   await loader.reload();
   assert.deepEqual(loader.getExtensions().errors, []);
+  const herdrSkills = loader.getSkills().skills.filter((skill) => skill.name === "herdr");
+  assert.equal(herdrSkills.length, profile === "recommended" ? 1 : 0);
+  if (profile === "recommended") {
+    const official = spawnSync("herdr", ["--skill"], { encoding: "utf8" });
+    assert.equal(official.status, 0, official.stderr || official.error?.message);
+    assert.equal(readFileSync(herdrSkills[0].filePath, "utf8"), official.stdout);
+  }
+  const hunkSkills = loader.getSkills().skills.filter((skill) => skill.name === "hunk-review");
+  assert.equal(hunkSkills.length, profile === "recommended" ? 1 : 0);
+  if (profile === "recommended") {
+    assert.equal(loader.getSkills().diagnostics.length, 0);
+    assert.match(hunkSkills[0].filePath, /\/(?:\.agents|hunk)\/skills\/hunk-review\/SKILL\.md$/);
+    const skill = spawnSync("hunk", ["skill", "show", "hunk-review"], { encoding: "utf8" });
+    assert.equal(skill.status, 0, skill.stderr || skill.error?.message);
+    assert.match(skill.stdout, /hunk-review/);
+  }
   const { session } = await createAgentSession({
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(),

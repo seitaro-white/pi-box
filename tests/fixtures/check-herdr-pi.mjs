@@ -18,6 +18,10 @@ assert(existsSync(extension));
 const loader = new DefaultResourceLoader({ cwd: "/workspace", agentDir });
 await loader.reload();
 assert.deepEqual(loader.getExtensions().errors, []);
+// Image-owned global skills remain visible with fresh and reused agent volumes.
+for (const name of ["hunk-review", "herdr"]) {
+  assert.equal(loader.getSkills().skills.filter((skill) => skill.name === name).length, 1, name);
+}
 assert.equal(loader.getExtensions().extensions.filter((item) => item.resolvedPath === extension).length, 1);
 assert.equal(existsSync("/opt/pi/node_modules/@muzi3/herdr-agent-state"), false);
 const { session } = await createAgentSession({

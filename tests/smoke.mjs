@@ -166,6 +166,7 @@ async function runSmoke() {
     fixture("check-identity.sh", [
       `EXPECTED_PI_VERSION=${manifest.dependencies["@earendil-works/pi-coding-agent"]}`,
       `EXPECTED_PROFILE=${profile}`,
+      `EXPECTED_HUNK_VERSION=${readFileSync(new URL("../Dockerfile", import.meta.url), "utf8").match(/^ARG HUNK_VERSION=(.+)$/m)[1]}`,
     ]);
     fixture("check-extensions.mjs", [
       "PI_OFFLINE=1",

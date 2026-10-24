@@ -101,7 +101,8 @@ The default image includes:
 
 - **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
-- **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager. See [Pi-box setup and storage](docs/herdr.md).
+- **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager, with its official `herdr` skill exposed to Pi. See [Pi-box setup and storage](docs/herdr.md).
+- **[Hunk](https://hunk.dev/)** (recommended image) — interactive terminal diff reviewer, with its `hunk-review` skill exposed to Pi. See [Hunk review workflow](docs/hunk.md).
 - **Standard development tools:** Bash, Git, curl, ripgrep, fd (`fdfind` on Debian).
 - **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
@@ -124,7 +125,7 @@ The default image includes:
 
 ### What about skills?
 
-While I do have a set of development skills I use frequently, I'm of the opinion that skills a) are specific to the nature/requirements of individual projects & codebases, and b) are something best written yourself (or as part of a team) based on your requirements and experience of coding, so I've left them out.
+While I do have a set of development skills I use frequently, I'm of the opinion that skills a) are specific to the nature/requirements of individual projects & codebases, and b) are something best written yourself (or as part of a team) based on your requirements and experience of coding, so general-purpose development skills are left out. The recommended image does include the tool-specific `herdr` and `hunk-review` skills, which teach Pi how to control Herdr panes and interact with live Hunk review sessions.
 
 
 
@@ -132,7 +133,7 @@ While I do have a set of development skills I use frequently, I'm of the opinion
 
 ### Base image
 
-The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
+The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, Hunk (including its skill), the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
 
 ```dotenv
 TARGET=base

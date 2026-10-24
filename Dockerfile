@@ -60,7 +60,18 @@ WORKDIR /opt/pi
 # Download first so a failed fetch cannot be hidden by a successful shell pipe.
 RUN curl -fsSL https://herdr.dev/install.sh -o /tmp/install-herdr.sh \
     && HERDR_INSTALL_DIR=/usr/local/bin sh /tmp/install-herdr.sh \
-    && rm /tmp/install-herdr.sh
+    && rm /tmp/install-herdr.sh \
+    && install -d /home/node/.agents/skills/herdr \
+    && herdr --skill > /home/node/.agents/skills/herdr/SKILL.md
+# Hunk's standalone release bundles the matching review skill. Keep both outside
+# the persistent Pi volume so existing installs receive them on replacement.
+ARG HUNK_VERSION=0.24.0
+RUN curl -fsSL https://hunk.dev/install.sh -o /tmp/install-hunk.sh \
+    && HUNK_VERSION=${HUNK_VERSION} HUNK_INSTALL_DIR=/opt/hunk sh /tmp/install-hunk.sh --no-modify-path \
+    && rm /tmp/install-hunk.sh \
+    && ln -s /opt/hunk/hunk /usr/local/bin/hunk \
+    && install -d /home/node/.agents/skills \
+    && ln -s /opt/hunk/skills/hunk-review /home/node/.agents/skills/hunk-review
 # Image-owned installation, not hidden by an existing agent-volume mount.
 ARG RUFF_VERSION=0.17.0
 RUN UV_TOOL_DIR=/opt/ruff UV_TOOL_BIN_DIR=/usr/local/bin \

@@ -1,48 +1,49 @@
 # Tests
 
-Tests cover Pi Box's configuration, state-management and integration boundaries—not the complete feature sets of Docker, Pi extensions or sidecars. Host tests use only Node.js built-ins. Docker acceptance uses synthetic state and isolated projects; it never attaches to the normal Pi Box container or volumes.
-
-## Commands
+## Run
 
 ```sh
-npm test                         # Fast checks; no Docker or npm install
+npm test                         # Node built-ins only; no Docker or npm install
 
-# Build the three images consumed by the default acceptance suite.
+# Build images before acceptance:
 docker build --target base -t pi-box:0.2.0-base .
 docker build --target recommended -t pi-box:0.2.0 .
 docker build -f sandbox/pi-box.dockerfile -t pi-box:0.2.0-sandbox .
 npm run test:integration
 
-# Run selected checks, or explicitly include Phoenix.
+# Select suites:
 npm run test:integration -- config
 npm run test:integration -- compose postgres
-npm run test:integration -- herdr  # Persistent Herdr + offline Pi extension loading
-npm run test:integration -- phoenix
+npm run test:integration -- phoenix  # opt-in
 npm run test:integration -- --all
 ```
 
-The default selection is `config base recommended herdr sandbox compose postgres browserless`. Host tests run separately; acceptance does not repeat them. CI builds all three images and uses this same default selection on native AMD64/ARM64 runners.
+Default suites: `config base recommended herdr sandbox compose postgres browserless`.
+CI uses the same selection on native AMD64/ARM64. Override image names with
+`PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAGE` and `PI_BOX_SANDBOX_IMAGE`.
 
-Override prebuilt image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAGE` and `PI_BOX_SANDBOX_IMAGE`. Individual `smoke.mjs` runs also accept `PI_BOX_PROFILE` and `PI_BOX_IMAGE`. Sidecar acceptance may pull the pinned upstream images; Browserless installs its lockfile-pinned client in disposable Pi storage, and Phoenix explicitly installs the documented `pi-otel` package there.
+## Coverage
 
-## Layout and responsibilities
+| Tests | Boundary |
+|---|---|
+| `*.test.mjs` | State preservation, replacement guards, manifest/lockfile consistency, sandbox definitions |
+| `compose-configuration.mjs` | Overlay combinations, storage and port wiring |
+| `smoke.mjs` | Base/recommended tools, permissions, Pi guidance/skills, extensions and LSP |
+| `herdr-integration.mjs` | Reporter installation, offline extension loading and persistent Herdr state |
+| `compose.mjs` | Make/Compose lifecycle, dev port, replacement and persistent Pi/workspace/Git state |
+| `postgres-integration.mjs` | SQL connectivity and persistence |
+| `browserless-integration.mjs` | Authenticated CDP, Pi-served page interaction and artifacts |
+| `phoenix-integration.mjs` | Synthetic Pi traces and Phoenix persistence |
+| `sandbox-image.mjs` | Sandbox image without sbx or credentials |
 
-- `*.test.mjs`: state initialization/reconciliation, preflight data-loss guards, manifest/lockfile drift, version reporting and sandbox build-context boundaries.
-- `integration.mjs`: selects acceptance suites; no image building.
-- `compose-configuration.mjs`: resolves all eight overlay selections and checks wiring, optionality, storage names and network exposure, including default/custom loopback-only dev ports. Does not start containers.
-- `smoke.mjs`: image identity, writable/private state, pinned runtime, actual environment instructions/skill discovery inside a project Git root, extension loading and basic LSP connectivity for base/recommended images.
-- `herdr-integration.mjs`: offline Pi extension loading, the official reporter installed/refreshed at startup and a dedicated Herdr volume seeded from the image, persistent config/layout/state, worktree location and tmux coexistence. Interactive status and conversation resume remain manual checks.
-- `compose.mjs`: real Make/Compose startup, host-to-container HTTP on an ephemeral loopback dev port, idempotence, replacement refusal and persistence of workspace, Pi state and Git credentials. This is the authoritative lifecycle test.
-- `postgres-integration.mjs`: a Pi-side SQL connection and a stored value surviving database recreation.
-- `browserless-integration.mjs`: authenticated CDP and navigation from the browser to a Pi-served page.
-- `phoenix-integration.mjs`: documented exporter setup, a recognizable synthetic Pi trace and persistent Phoenix storage. Opt-in; no real models or credentials.
-- `sandbox-image.mjs`: sandbox Dockerfile acceptance without sbx/KVM/login.
-- `sandbox-smoke.mjs`: **manual diagnostic of an existing sandbox**, not a disposable test. It writes a temporary canary and runs the initializer; optional restart ends active sessions. See [the sandbox guide](../docs/sandboxes.md).
-- `helpers/`: command execution, isolated Compose projects, temporary files and synthetic agent state.
-- `fixtures/`: executable in-container assertions and small synthetic inputs. `seed-storage.mjs` explicitly creates everything checked by `check-persistence.mjs`.
+`tests/sandbox-smoke.mjs` is a **manual check of an existing sandbox**; its optional
+restart ends running sessions. See the [sandbox guide](../docs/sandboxes.md).
 
 ## Isolation and failures
 
-Compose tests copy public configuration/scripts into a private temporary directory, generate synthetic credentials and override all project/container/volume names. They do not read the checkout's `.env`. Dev-server ports use ephemeral host ports to avoid conflicts with operator containers. Successful runs clean up their own resources. Failures print diagnostics and also clean up by default; set `PI_BOX_KEEP_TEST_RESOURCES=1` to retain a failing test's resources for inspection. Never use global Docker pruning to clean up a test.
+Docker acceptance uses temporary projects, synthetic credentials, isolated volumes
+and ephemeral host ports, independently of the checkout's `.env` and normal Pi-box
+resources. Sidecar tests may pull images and install disposable clients/exporters.
 
-Live sandbox checks remain manual. Podman and migration of old `pi`/`db` services or agent volumes predating package-ownership tracking are no longer supported by this suite.
+Runs clean up owned resources, including on failure. Set
+`PI_BOX_KEEP_TEST_RESOURCES=1` to retain failing resources for inspection.

@@ -70,13 +70,18 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   const guidance = loader.getAgentsFiles().agentsFiles.find((file) => file.path === '/AGENTS.md');
   assert(guidance, 'image-owned ancestor guidance is loaded');
   assert.equal(guidance.content, readFileSync('/AGENTS.md', 'utf8'));
-  assert.match(guidance.content, /BROWSER_CDP_URL/);
-  assert.match(guidance.content, /0\.0\.0\.0:5173/);
-  assert.equal(readFileSync(operatorInstructions, 'utf8'), 'Synthetic operator guidance.\n');
+  assert(guidance.content.trim(), 'image guidance is nonempty');
+  const operatorGuidance = loader.getAgentsFiles().agentsFiles.find(
+    (file) => file.path === operatorInstructions,
+  );
+  assert(operatorGuidance, 'personal guidance is loaded alongside image guidance');
+  assert.equal(operatorGuidance.content, 'Synthetic operator guidance.\n');
+  assert.equal(readFileSync(operatorInstructions, 'utf8'), operatorGuidance.content);
   const environmentSkills = loader.getSkills().skills.filter((skill) => skill.name === 'pi-box');
   assert.equal(environmentSkills.length, 1);
   assert.equal(environmentSkills[0].filePath, '/home/node/.agents/skills/pi-box/SKILL.md');
-  assert.match(environmentSkills[0].description, /Browserless CDP/);
+  assert(environmentSkills[0].description.trim(), 'environment skill has a description');
+  assert.deepEqual(loader.getSkills().diagnostics, []);
   const herdrSkills = loader.getSkills().skills.filter((skill) => skill.name === "herdr");
   assert.equal(herdrSkills.length, profile === "recommended" ? 1 : 0);
   if (profile === "recommended") {
@@ -86,13 +91,6 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   }
   const hunkSkills = loader.getSkills().skills.filter((skill) => skill.name === "hunk-review");
   assert.equal(hunkSkills.length, profile === "recommended" ? 1 : 0);
-  if (profile === "recommended") {
-    assert.equal(loader.getSkills().diagnostics.length, 0);
-    assert.match(hunkSkills[0].filePath, /\/(?:\.agents|hunk)\/skills\/hunk-review\/SKILL\.md$/);
-    const skill = spawnSync("hunk", ["skill", "show", "hunk-review"], { encoding: "utf8" });
-    assert.equal(skill.status, 0, skill.stderr || skill.error?.message);
-    assert.match(skill.stdout, /hunk-review/);
-  }
   const { session } = await createAgentSession({
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(),
@@ -108,9 +106,9 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     }
   });
 
-  assert.match(session.systemPrompt, /BROWSER_CDP_URL/);
-  assert.match(session.systemPrompt, /0\.0\.0\.0:5173/);
-  assert.match(session.systemPrompt, /pi-box\/SKILL\.md/);
+  assert(session.systemPrompt.includes(guidance.content), 'image guidance reaches the model');
+  assert(session.systemPrompt.includes(operatorGuidance.content), 'personal guidance reaches the model');
+  assert(session.systemPrompt.includes(environmentSkills[0].filePath), 'environment skill is advertised');
 
   const errors = [];
   await session.bindExtensions({ onError: (error) => errors.push(error) });

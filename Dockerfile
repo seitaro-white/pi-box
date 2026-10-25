@@ -34,6 +34,11 @@ ENV HOME=/home/node \
     TERM=xterm-256color \
     PI_TELEMETRY=0
 
+# Image-owned guidance stays current and is not hidden by persistent volumes.
+# Pi loads ancestor AGENTS.md files and discovers ~/.agents/skills automatically.
+COPY container/defaults/AGENTS.md /AGENTS.md
+COPY container/skills/pi-box/SKILL.md /home/node/.agents/skills/pi-box/SKILL.md
+
 ENTRYPOINT ["/usr/local/bin/pi-box-entrypoint"]
 CMD ["tmux", "-D"]
 

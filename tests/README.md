@@ -29,10 +29,10 @@ Override prebuilt image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAG
 
 - `*.test.mjs`: state initialization/reconciliation, preflight data-loss guards, manifest/lockfile drift, version reporting and sandbox build-context boundaries.
 - `integration.mjs`: selects acceptance suites; no image building.
-- `compose-configuration.mjs`: resolves all eight overlay selections and checks wiring, optionality, storage names and network exposure. Does not start containers.
-- `smoke.mjs`: image identity, writable/private state, pinned runtime, extension loading and basic LSP connectivity for base/recommended images.
+- `compose-configuration.mjs`: resolves all eight overlay selections and checks wiring, optionality, storage names and network exposure, including default/custom loopback-only dev ports. Does not start containers.
+- `smoke.mjs`: image identity, writable/private state, pinned runtime, actual environment instructions/skill discovery inside a project Git root, extension loading and basic LSP connectivity for base/recommended images.
 - `herdr-integration.mjs`: offline Pi extension loading, the official reporter installed/refreshed at startup and a dedicated Herdr volume seeded from the image, persistent config/layout/state, worktree location and tmux coexistence. Interactive status and conversation resume remain manual checks.
-- `compose.mjs`: real Make/Compose startup, idempotence, replacement refusal and persistence of workspace, Pi state and Git credentials. This is the authoritative lifecycle test.
+- `compose.mjs`: real Make/Compose startup, host-to-container HTTP on an ephemeral loopback dev port, idempotence, replacement refusal and persistence of workspace, Pi state and Git credentials. This is the authoritative lifecycle test.
 - `postgres-integration.mjs`: a Pi-side SQL connection and a stored value surviving database recreation.
 - `browserless-integration.mjs`: authenticated CDP and navigation from the browser to a Pi-served page.
 - `phoenix-integration.mjs`: documented exporter setup, a recognizable synthetic Pi trace and persistent Phoenix storage. Opt-in; no real models or credentials.
@@ -43,6 +43,6 @@ Override prebuilt image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAG
 
 ## Isolation and failures
 
-Compose tests copy public configuration/scripts into a private temporary directory, generate synthetic credentials and override all project/container/volume names. They do not read the checkout's `.env`. Successful runs clean up their own resources. Failures print diagnostics and also clean up by default; set `PI_BOX_KEEP_TEST_RESOURCES=1` to retain a failing test's resources for inspection. Never use global Docker pruning to clean up a test.
+Compose tests copy public configuration/scripts into a private temporary directory, generate synthetic credentials and override all project/container/volume names. They do not read the checkout's `.env`. Dev-server ports use ephemeral host ports to avoid conflicts with operator containers. Successful runs clean up their own resources. Failures print diagnostics and also clean up by default; set `PI_BOX_KEEP_TEST_RESOURCES=1` to retain a failing test's resources for inspection. Never use global Docker pruning to clean up a test.
 
 Live sandbox checks remain manual. Podman and migration of old `pi`/`db` services or agent volumes predating package-ownership tracking are no longer supported by this suite.

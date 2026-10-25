@@ -21,6 +21,7 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
 - [Advanced setup and technical details](#advanced-setup-and-technical-details)
   - [Base image](#base-image)
   - [Git setup](#git-setup)
+  - [Web development and browser access](#web-development-and-browser-access)
   - [Optional services: PostgreSQL](#optional-services-postgresql)
   - [Optional services: Browserless Chromium](#optional-services-browserless-chromium)
   - [Optional services: Phoenix tracing](#optional-services-phoenix-tracing)
@@ -140,6 +141,15 @@ TARGET=base
 IMAGE=pi-box:0.2.0-base
 ```
 
+Both Compose image variants include short, always-loaded environment instructions
+at `/AGENTS.md` and a discoverable `pi-box` skill under
+`/home/node/.agents/skills/pi-box`. They explain optional-service discovery,
+Browserless CDP, dev-server binding and host/SSH access. These are image-owned,
+outside the persistent volumes, so rebuilding/replacing Pi updates them without
+overwriting personal `~/.pi/agent/AGENTS.md` or settings. Run Pi's `/reload` after
+guidance changes in a running environment. The Docker Sandbox image does not
+currently bundle this Compose-specific guidance.
+
 Runtime defaults follow the sandbox where possible: Pi uses `~/.pi/agent`, checks for updates normally, and the pager is `batcat`. Compose keeps install telemetry disabled and redirects later uv Python/tool installs into the persistent agent volume; these installs survive container replacement.
 
 ### Git setup
@@ -156,6 +166,68 @@ Compose remains the primary workflow, with reusable named volumes. The optional
 sandbox defaults to internal storage that survives stop/start but not deletion;
 [shared host-directory storage](docs/sandboxes.md#optional-shared-storage) is also
 documented. Neither path migrates or deletes the other's storage.
+
+### Web development and browser access
+
+Compose publishes container port **5173** at **http://localhost:5173** on the
+Docker host, bound only to `127.0.0.1` (not the LAN or Tailscale interface).
+Your host browser and Pi's optional Browserless browser visit the same app,
+but have separate tabs, cookies and sessions; no browser mirroring is involved.
+
+The app must listen on **`0.0.0.0:5173` inside Pi**. Set this once per project
+in its dev-server configuration or `package.json` script. For Vite:
+
+```json
+{
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173 --strictPort"
+  }
+}
+```
+
+Then just run `npm run dev` inside the project. `--strictPort` prevents Vite
+silently choosing an unpublished port when 5173 is busy. Other frameworks need
+their equivalent host/port settings; Compose does not configure the app itself.
+Only one app can use container port 5173 at a time.
+
+Pi's Browserless sidecar visits **`http://pi-box:5173`** and should connect using
+`BROWSER_CDP_URL` and `BROWSER_TOKEN`, not launch Chromium inside Pi. See the
+[Browserless guide](docs/browserless.md). Browserless is not needed for manual
+viewing in your host browser.
+
+For another host port (for example, multiple Pi Box instances), set
+`DEV_PORT=15173` in private `.env`, then apply with `make up`. Open
+`http://localhost:15173`; the app and Browserless still use container port 5173.
+Applying port changes recreates Pi and ends active sessions, so finish work first.
+Existing installations must also apply this Compose change before the port is
+available. This port publishing applies to Compose, not Docker Sandboxes.
+
+**Viewing from another machine (e.g. ThinkPad → Mac over Tailscale):**
+
+```bash
+# Run on the viewing machine; use your existing SSH hostname/alias for the Docker host.
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:5173:127.0.0.1:5173 your-mac-ssh-alias
+```
+
+Keep that connection open and visit `http://localhost:5173` on the ThinkPad.
+`-N` opens only the tunnel; keep your normal Pi terminal connection separately.
+No Tailscale changes or SSH server in the container are needed, provided your
+existing host SSH access allows TCP forwarding. No Mac zsh alias changes are
+needed for local viewing. You can save the tunnel once in the ThinkPad's
+`~/.ssh/config` under a dedicated alias:
+
+```sshconfig
+Host pi-box-web
+    HostName your-mac-tailscale-name
+    User your-mac-user
+    LocalForward 127.0.0.1:5173 127.0.0.1:5173
+    ExitOnForwardFailure yes
+```
+
+Then run `ssh -N pi-box-web`. If the ThinkPad's port 5173 is occupied, change
+only the first port to 15173 and browse `http://localhost:15173`. If the Docker
+host uses a custom `DEV_PORT`, change the destination (last) port accordingly.
+Do not expose the dev server publicly or use Tailscale Serve/Funnel for this workflow.
 
 ### Optional services: PostgreSQL
 

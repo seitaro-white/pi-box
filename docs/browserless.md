@@ -31,6 +31,25 @@ has outbound networking and can reach Pi and other services. This is **not a
 multi-tenant security boundary**. Keep tokens private: Docker administrators and
 `docker compose config` can reveal them. Never log authenticated URLs.
 
+## Discovery and client workflow
+
+The Compose images include always-loaded environment instructions and the `pi-box`
+skill, which tell Pi to connect using `BROWSER_CDP_URL` and `BROWSER_TOKEN` for
+browser testing. No separate health check is needed: connect with a timeout and
+diagnose any failure. Do not print the values or authenticated URLs/errors.
+
+Browserless supplies the remote browser, **not a dedicated Pi browser tool**.
+Writing a small Node or Python client script and executing it through the shell
+is expected. Prefer existing project clients; for Node projects, `playwright-core`
+is enough. Python Playwright's `chromium.connect_over_cdp()` is equally valid when
+already available. Keep repeatable checks in project scripts/tests; temporary
+scripts are fine for one-off inspection. No local browser download is needed.
+
+Connect with `connectOverCDP()` / `connect_over_cdp()`, not `chromium.launch()`.
+A local launch error such as missing `libglib-2.0.so.0` does not diagnose the
+sidecar: it means a different browser was being launched inside Pi. Do not fix
+that by installing local Chromium/libraries when a working sidecar is configured.
+
 Install your own client in a project inside Pi (`npm install playwright-core@1.64.1`).
 This JavaScript example saves client-side artifacts in Pi's `/workspace`:
 
@@ -61,8 +80,13 @@ session after disconnect. The upstream default session timeout is **30 seconds**
 (concurrency 10, queue 10). No persistence across connections is promised; close
 owned contexts and disconnect promptly. Acceptance verifies a fresh connection.
 
-Browser `localhost` is the **browser container**, not Pi. Serve Pi applications
-on `0.0.0.0` and visit `http://pi-box:PORT`. Pi files are not browser-side `file://`
+Browser `localhost` is the **browser container**, not Pi. For the default Compose
+dev-server mapping, serve Pi applications on `0.0.0.0:5173` and visit
+`http://pi-box:5173` from Browserless. The user's separate host browser opens
+`http://localhost:5173` (remote users need an SSH tunnel); see
+[web development and browser access](../README.md#web-development-and-browser-access).
+Other internal ports can use `http://pi-box:PORT`, but require a matching published
+port for host viewing. Pi files are not browser-side `file://`
 files: serve them over HTTP or use `page.setContent()`. Client-saved artifacts
 live in Pi, not the browser container.
 

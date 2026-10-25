@@ -3,9 +3,10 @@ name: pi-box
 description: >-
   Operate inside the Pi-box development environment: filesystem layout,
   persistence, tool installation, optional sidecar connections, and
-  host/container boundaries. Use when troubleshooting the environment,
-  installing tools, connecting to services, or determining what survives
-  a restart or replacement.
+  host/container boundaries. Use when starting web dev servers, forwarding
+  ports, taking screenshots, running browser tests through Browserless CDP,
+  troubleshooting the environment, installing tools, connecting to services,
+  or determining what survives a restart or replacement.
 ---
 
 # Pi-box environment guide
@@ -71,13 +72,33 @@ explicit working-directory requirement.
 Do not recommend container replacement without warning that it ends
 running sessions. Destructive volume operations require explicit approval.
 
+## Web development and port forwarding
+
+Run the project's web server on **`0.0.0.0:5173`** for the default Compose
+mapping. Save the binding in its normal dev script/config; for Vite:
+`"dev": "vite --host 0.0.0.0 --port 5173 --strictPort"`. If the project needs
+another port, ask for a matching host-side Compose mapping instead of silently
+changing the project's convention or falling back to an unpublished port.
+
+The browser sidecar and the user's browser are separate clients of the same app:
+- **Pi's Browserless browser:** open `http://pi-box:5173` over the Docker network.
+- **User on the Docker host:** open `http://localhost:5173`, published on host
+  loopback only. Host `.env` setting `DEV_PORT` changes this host port, not 5173
+  inside Pi.
+- **User on another machine:** forward the Docker host's loopback port through
+  their existing SSH connection, then open localhost there. For example, on the
+  viewing machine: `ssh -N -L 127.0.0.1:5173:127.0.0.1:5173 your-docker-host`.
+
+Port publishing is managed on the host; these mappings do not apply to Docker
+Sandboxes. Never claim visual review passed based only on an HTTP check.
+
 ## Connecting to optional services
 
 Inside Compose, use service DNS names—not `localhost`.
 
-Configuration being present does not prove a service is running.
-Check availability with a bounded connection attempt. Report failures
-without exposing credentials.
+Connect directly using the supplied configuration, with a timeout. If it fails,
+distinguish missing configuration, a missing client and an unreachable service;
+report the failure without exposing credentials.
 
 ### PostgreSQL
 
@@ -95,11 +116,66 @@ password does not rotate the password of an existing database.
 
 ### Browserless Chromium
 
-- Default service address: `browser:3000`.
-- Use `BROWSER_CDP_URL` and `BROWSER_TOKEN` as configured.
-- Treat the connection URL as a secret: it may contain the token.
-- Install any browser client needed by the project in that project.
-- Close browser sessions and connections when finished.
+- Connect using `BROWSER_CDP_URL` and `BROWSER_TOKEN`; no separate health check
+  is needed. If they are missing, ask the user to enable the browser overlay.
+- Default service address: `browser:3000`; use the configured URL, not a guess.
+- The Pi image has no local Chromium or browser client. Missing Linux browser
+  libraries usually mean an incorrect local launch, not a broken sidecar.
+- Use `chromium.connectOverCDP()` (Python: `connect_over_cdp()`), never
+  `chromium.launch()` for this sidecar. Do not run `playwright install`, install
+  Linux browser libraries, or fall back to a local browser without approval.
+- Prefer the project's existing browser client. For Node projects without one,
+  `playwright-core` is sufficient; no downloaded browser is needed. Keep client
+  dependencies project-local and follow the project's dependency policy.
+- A small script run through the shell is the expected client workflow; no
+  dedicated browser tool is bundled. Python Playwright is also valid if already
+  available. Keep reusable checks in project scripts/tests; use temporary scripts
+  for one-off inspection and clean them up when done.
+- Treat the authenticated URL as a secret. Build it from environment variables
+  in the script; never hard-code tokens or pass authenticated URLs as shell args.
+  Do not echo raw connection errors/debug logs that may contain the URL.
+- Use bounded connect/navigation timeouts. Report a sanitized failure instead of
+  repeatedly installing browsers. The upstream default session limit is 30 seconds.
+- Browser `localhost` means the browser sidecar, not Pi. Visit Pi-served apps at
+  `http://pi-box:5173`; serve files over HTTP or use `page.setContent()` instead
+  of assuming Pi's `file://` paths are available to the browser.
+- Save screenshots to the project in `/workspace`; close owned contexts and
+  disconnect in `finally`. Browserless normally disposes sessions on disconnect.
+
+Minimal Node client (requires project-local `playwright-core`):
+
+```javascript
+import { chromium } from 'playwright-core';
+
+const url = new URL(process.env.BROWSER_CDP_URL);
+url.searchParams.set('token', process.env.BROWSER_TOKEN);
+let browser;
+let context;
+try {
+  browser = await chromium.connectOverCDP(url.href, { timeout: 10_000 });
+  context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('http://pi-box:5173', { timeout: 15_000 });
+  await page.screenshot({ path: 'page.png', fullPage: true });
+} catch {
+  // Do not print the underlying exception: it can include the authenticated URL.
+  console.error('Browser check failed; inspect app and sidecar availability without logging credentials.');
+  process.exitCode = 1;
+} finally {
+  try {
+    try {
+      if (context) await context.close();
+    } finally {
+      if (browser) await browser.close();
+    }
+  } catch {
+    console.error('Browser cleanup failed (connection details omitted).');
+    process.exitCode = 1;
+  }
+}
+```
+
+Run from the project directory so the artifact path is inside `/workspace`. Never claim visual review passed just because an HTTP request succeeded.
 
 The default service has no persistent storage and publishes no host port.
 It is intended for trusted development; upstream disables Chromium's

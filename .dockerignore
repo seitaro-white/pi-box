@@ -17,6 +17,12 @@ container/**
 !container/defaults/
 container/defaults/**
 !container/defaults/herdr.toml
+!container/defaults/AGENTS.md
+!container/skills/
+container/skills/**
+!container/skills/pi-box/
+container/skills/pi-box/**
+!container/skills/pi-box/SKILL.md
 !container/prepare-runtime.mjs
 !container/base/
 container/base/**

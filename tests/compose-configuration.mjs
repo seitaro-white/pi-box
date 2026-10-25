@@ -8,11 +8,19 @@ await withComposeProject({
     POSTGRES_PASSWORD: "synthetic-config-only",
     BROWSER_TOKEN: "synthetic-config-only",
     PHOENIX_UI_PORT: "0",
+    DEV_PORT: "", // Exercise Compose's 5173 default, not the helper's ephemeral port.
   },
 }, async (p) => {
   const base = p.config(["compose.yaml"]);
   assert.deepEqual(Object.keys(base.services), ["pi-box"]);
-  assert.equal(base.services["pi-box"].ports, undefined);
+  const assertDevPort = (service, published) => {
+    assert.equal(service.ports.length, 1);
+    assert.equal(service.ports[0].host_ip, "127.0.0.1");
+    assert.equal(service.ports[0].target, 5173);
+    assert.equal(String(service.ports[0].published), published);
+    assert.equal(service.ports[0].protocol, "tcp");
+  };
+  assertDevPort(base.services["pi-box"], "5173");
   assert.equal(base.services["pi-box"].build.target, "recommended");
   assert.deepEqual(
     Object.values(base.volumes).map((volume) => volume.name).sort(),
@@ -32,7 +40,7 @@ await withComposeProject({
       ...(mask & 2 ? ["browser"] : []),
       ...(mask & 4 ? ["phoenix"] : []),
     ].sort());
-    assert.equal(config.services["pi-box"].ports, undefined);
+    assertDevPort(config.services["pi-box"], "5173");
     if (mask & 1) {
       assert.equal(config.services["pi-box"].environment.PGHOST, "postgres");
       assert.equal(config.services["pi-box"].environment.PGPASSWORD, config.services.postgres.environment.POSTGRES_PASSWORD);
@@ -57,5 +65,14 @@ await withComposeProject({
       assert.deepEqual(config.services["pi-box"], withoutPhoenix.services["pi-box"], "Phoenix must not modify or enable tracing in Pi");
     }
   }
-  console.log("PASS: Pi-only defaults, isolated volumes and all eight optional-service selections.");
+  console.log("PASS: Loopback dev port, isolated volumes and all eight optional-service selections.");
+});
+
+await withComposeProject({ name: "custom-dev-port", settings: { DEV_PORT: "15173" } }, async (p) => {
+  const port = p.config().services["pi-box"].ports;
+  assert.equal(port.length, 1);
+  assert.equal(port[0].host_ip, "127.0.0.1");
+  assert.equal(port[0].target, 5173);
+  assert.equal(String(port[0].published), "15173");
+  console.log("PASS: Custom host port preserves loopback binding and container port 5173.");
 });

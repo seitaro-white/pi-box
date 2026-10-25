@@ -18,6 +18,7 @@ export async function withComposeProject({ name, overlays = [], settings = {} },
     POSTGRES_PASSWORD: randomBytes(32).toString("hex"),
     BROWSER_TOKEN: randomBytes(32).toString("hex"),
     PHOENIX_UI_PORT: "0",
+    DEV_PORT: "0", // Ephemeral host port: never collide with an operator's dev server.
     ...settings,
     COMPOSE_FILE: ["compose.yaml", ...overlays].join(":"),
     COMPOSE_PROJECT_NAME: project,

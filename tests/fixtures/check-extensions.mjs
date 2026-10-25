@@ -56,9 +56,27 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     }
   }
 
-  const loader = new DefaultResourceLoader({ cwd: "/workspace", agentDir });
+  // Prove guidance is actually discovered, even inside a project Git root and
+  // alongside operator-owned global instructions in the persistent agent volume.
+  const project = mkdtempSync('/workspace/guidance-');
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const git = spawnSync('git', ['init', '--quiet', project], { encoding: 'utf8' });
+  assert.equal(git.status, 0, git.stderr);
+  const operatorInstructions = join(agentDir, 'AGENTS.md');
+  writeFileSync(operatorInstructions, 'Synthetic operator guidance.\n');
+  const loader = new DefaultResourceLoader({ cwd: project, agentDir });
   await loader.reload();
   assert.deepEqual(loader.getExtensions().errors, []);
+  const guidance = loader.getAgentsFiles().agentsFiles.find((file) => file.path === '/AGENTS.md');
+  assert(guidance, 'image-owned ancestor guidance is loaded');
+  assert.equal(guidance.content, readFileSync('/AGENTS.md', 'utf8'));
+  assert.match(guidance.content, /BROWSER_CDP_URL/);
+  assert.match(guidance.content, /0\.0\.0\.0:5173/);
+  assert.equal(readFileSync(operatorInstructions, 'utf8'), 'Synthetic operator guidance.\n');
+  const environmentSkills = loader.getSkills().skills.filter((skill) => skill.name === 'pi-box');
+  assert.equal(environmentSkills.length, 1);
+  assert.equal(environmentSkills[0].filePath, '/home/node/.agents/skills/pi-box/SKILL.md');
+  assert.match(environmentSkills[0].description, /Browserless CDP/);
   const herdrSkills = loader.getSkills().skills.filter((skill) => skill.name === "herdr");
   assert.equal(herdrSkills.length, profile === "recommended" ? 1 : 0);
   if (profile === "recommended") {
@@ -89,6 +107,10 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
       session.dispose();
     }
   });
+
+  assert.match(session.systemPrompt, /BROWSER_CDP_URL/);
+  assert.match(session.systemPrompt, /0\.0\.0\.0:5173/);
+  assert.match(session.systemPrompt, /pi-box\/SKILL\.md/);
 
   const errors = [];
   await session.bindExtensions({ onError: (error) => errors.push(error) });

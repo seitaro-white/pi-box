@@ -2,7 +2,7 @@
 name: pi-box
 description: >-
   Operate inside Pi-box: filesystem and persistence, tool installation,
-  optional services, web dev servers, browser testing/screenshots over CDP,
+  optional services, web dev servers, browser testing/screenshots over Browserless CDP,
   and host/container boundaries.
 ---
 

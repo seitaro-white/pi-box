@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Shared development tools; no Pi packages are installed in this stage.
 FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS common
 
@@ -91,6 +92,9 @@ RUN node prepare-runtime.mjs recommended \
     && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
+# BuildKit resolves main on every build and keys the cache by its commit.
+# Keep the old package path so existing settings and resource filters still work.
+ADD https://github.com/seitaro-white/personal-agent-skills.git#main /opt/pi/node_modules/personal-skills/
 # Docker seeds a fresh Herdr volume from these image-owned defaults.
 RUN install -d -m 0700 -o node -g node /home/node/.herdr/config \
         /home/node/.herdr/state /home/node/.local/state \

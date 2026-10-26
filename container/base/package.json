@@ -8,6 +8,7 @@
     "@earendil-works/pi-coding-agent": "1.4.0"
   },
   "piBox": {
+    "personalSkills": false,
     "npmTools": []
   }
 }

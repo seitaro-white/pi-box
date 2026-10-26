@@ -14,10 +14,10 @@
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
     "@juicesharp/rpiv-todo": "2.15.0",
     "pi-stretchtext": "0.1.0",
-    "pi-calm": "git+https://github.com/JesseZhang97/pi-calm.git#d4ae210f05e1d6b8157172c6769be73b8ea533f9",
-    "personal-skills": "git+https://github.com/seitaro-white/personal-agent-skills.git#dd705f7a79dc17d866548a3518c0a26c039d601e"
+    "pi-calm": "git+https://github.com/JesseZhang97/pi-calm.git#d4ae210f05e1d6b8157172c6769be73b8ea533f9"
   },
   "piBox": {
+    "personalSkills": true,
     "npmTools": [
       "@biomejs/biome"
     ]

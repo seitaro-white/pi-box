@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { prepareRuntime, PI_PACKAGE } from "../container/prepare-runtime.mjs";
@@ -56,7 +57,7 @@ describe("runtime manifests", () => {
     const lock = assertCommittedRuntime("base", {
       manifest: {
         ...source,
-        piBox: { ...source.piBox, npmTools: [] },
+        piBox: { ...source.piBox, personalSkills: false, npmTools: [] },
         dependencies: { [PI_PACKAGE]: source.dependencies[PI_PACKAGE] },
       },
       settings: { packages: [] },
@@ -70,7 +71,7 @@ describe("runtime manifests", () => {
     assertCommittedRuntime("recommended", {
       manifest: source,
       settings: {
-        packages: extensions.map((name) => `/opt/pi/node_modules/${name}`),
+        packages: [...extensions.map((name) => `/opt/pi/node_modules/${name}`), "/opt/pi/node_modules/personal-skills"],
       },
     });
     assert.throws(
@@ -84,6 +85,21 @@ describe("runtime manifests", () => {
         ),
       /Use an exact version/,
     );
+  });
+
+  it("adds personal skills from main at build time, outside both npm locks", () => {
+    assert.equal(source.piBox.personalSkills, true);
+    assert.equal(source.dependencies["personal-skills"], undefined);
+    for (const prefix of ["container", "container/base"]) {
+      const lock = readJson(join(root, prefix, "package-lock.json"));
+      assert.equal(lock.packages["node_modules/personal-skills"], undefined);
+    }
+    const instruction = "ADD https://github.com/seitaro-white/personal-agent-skills.git#main /opt/pi/node_modules/personal-skills/";
+    for (const file of ["Dockerfile", "sandbox/pi-box.dockerfile"]) {
+      const dockerfile = readFileSync(join(root, file), "utf8");
+      assert(dockerfile.startsWith("# syntax=docker/dockerfile:1\n"), file);
+      assert(dockerfile.split("\n").includes(instruction), file);
+    }
   });
 
   it("accepts full HTTPS Git commit pins but rejects floating refs", () => {

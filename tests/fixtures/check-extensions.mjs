@@ -63,6 +63,11 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     }
   }
 
+  const personalSkills = "/opt/pi/node_modules/personal-skills";
+  assert.equal(existsSync(`${personalSkills}/package.json`), profile === "recommended");
+  assert.equal(existsSync(`${personalSkills}/.git`), false);
+  assert.equal(readJson("/opt/pi/package-lock.json").packages["node_modules/personal-skills"], undefined);
+
   // Prove guidance is actually discovered, even inside a project Git root and
   // alongside operator-owned global instructions in the persistent agent volume.
   const project = mkdtempSync('/workspace/guidance-');
@@ -156,7 +161,7 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   for (const name of ["create-plan", "review-changes", "clean-up"]) {
     assert.equal(
       loader.getSkills().skills.some((skill) => skill.name === name),
-      bundled.has("personal-skills"),
+      profile === "recommended",
       `personal skill ${name}`,
     );
   }

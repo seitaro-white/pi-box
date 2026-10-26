@@ -25,6 +25,8 @@ RUN node prepare-runtime.mjs recommended \
     && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
+# Resolve main on each build, independently of the npm lockfile and RUN cache.
+ADD https://github.com/seitaro-white/personal-agent-skills.git#main /opt/pi/node_modules/personal-skills/
 # sbx launch contract: agent UID 1000, bash, writable workspace and trusted CA.
 RUN install -d -m 0700 -o agent -g agent /home/agent/workspace \
         /home/agent/.pi/agent /home/agent/.local/bin \

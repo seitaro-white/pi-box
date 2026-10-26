@@ -103,7 +103,7 @@ The default image includes:
 - **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
 - **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager, with its official `herdr` skill exposed to Pi. See [Pi-box setup and storage](docs/herdr.md).
-- **[Hunk](https://hunk.dev/)** (recommended image) — interactive terminal diff reviewer, with its `hunk-review` skill exposed to Pi. See [Hunk review workflow](docs/hunk.md).
+- **[Hunk](https://hunk.dev/)** (recommended image) — interactive terminal diff reviewer, with its `hunk-review` skill exposed to Pi. See [Hunk](https://github.com/modem-dev/hunk).
 - **Standard development tools:** Bash, Git, curl, ripgrep, fd (`fdfind` on Debian).
 - **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
@@ -141,41 +141,31 @@ TARGET=base
 IMAGE=pi-box:0.2.0-base
 ```
 
-Both Compose image variants include short, always-loaded environment instructions
-at `/AGENTS.md` and a discoverable `pi-box` skill under
-`/home/node/.agents/skills/pi-box`. They explain optional-service discovery,
-Browserless CDP, dev-server binding and host/SSH access. These are image-owned,
-outside the persistent volumes, so rebuilding/replacing Pi updates them without
-overwriting personal `~/.pi/agent/AGENTS.md` or settings. Run Pi's `/reload` after
-guidance changes in a running environment. The Docker Sandbox image does not
-currently bundle this Compose-specific guidance.
-
-Runtime defaults follow the sandbox where possible: Pi uses `~/.pi/agent`, checks for updates normally, and the pager is `batcat`. Compose keeps install telemetry disabled and redirects later uv Python/tool installs into the persistent agent volume; these installs survive container replacement.
+Both Compose variants include `/AGENTS.md` and a `pi-box` skill with environment
+and service instructions. Replacing the image updates these without changing
+personal Pi settings; use `/reload` in existing Pi sessions. uv Python/tool
+installs persist in the agent volume.
 
 ### Git setup
 
 Configure your Git identity inside the container and clone projects into `/workspace`. Git settings and HTTPS credentials persist in the Git volume; host Git configuration and SSH keys are not mounted automatically.
 
-For private repositories, use a narrowly scoped token. The default credential helper stores tokens as plaintext in `/home/node/.config/git/credentials`: private file permissions protect them from other users, not from Pi or other processes running as the container user.
+For private repositories, use a narrowly scoped token. The credential helper
+stores it as plaintext in `/home/node/.config/git/credentials`, readable by Pi.
 
-**Docker Sandboxes (opt-in):** a mountless micro-VM deployment is available for
-Apple Silicon Macs, managed with native `sbx env` commands and [`sbxenv.yaml`](sbxenv.yaml).
-See the [sandbox setup guide](docs/sandboxes.md) for installation, Codex `/login`,
-host-proxied GitHub access, and manual session management.
-Compose remains the primary workflow, with reusable named volumes. The optional
-sandbox defaults to internal storage that survives stop/start but not deletion;
-[shared host-directory storage](docs/sandboxes.md#optional-shared-storage) is also
-documented. Neither path migrates or deletes the other's storage.
+### Docker Sandboxes
+
+An optional mountless micro-VM deployment for Apple Silicon Macs uses native
+`sbx env` commands and [`sbxenv.yaml`](sbxenv.yaml). See the
+[sandbox guide](docs/sandboxes.md) for setup, login and storage options.
+Internal storage survives stop/start, but not sandbox deletion.
 
 ### Web development and browser access
 
-Compose publishes container port **5173** at **http://localhost:5173** on the
-Docker host, bound only to `127.0.0.1` (not the LAN or Tailscale interface).
-Your host browser and Pi's optional Browserless browser visit the same app,
-but have separate tabs, cookies and sessions; no browser mirroring is involved.
+Compose publishes port **5173** at **http://localhost:5173** on the Docker host's
+loopback interface. Bind your app to **`0.0.0.0:5173`** inside Pi.
 
-The app must listen on **`0.0.0.0:5173` inside Pi**. Set this once per project
-in its dev-server configuration or `package.json` script. For Vite:
+For Vite, set the project's dev script:
 
 ```json
 {
@@ -185,49 +175,21 @@ in its dev-server configuration or `package.json` script. For Vite:
 }
 ```
 
-Then just run `npm run dev` inside the project. `--strictPort` prevents Vite
-silently choosing an unpublished port when 5173 is busy. Other frameworks need
-their equivalent host/port settings; Compose does not configure the app itself.
-Only one app can use container port 5173 at a time.
+Run `npm run dev`. Pi's optional Browserless browser visits
+**`http://pi-box:5173`**; your host browser needs no sidecar.
 
-Pi's Browserless sidecar visits **`http://pi-box:5173`** and should connect using
-`BROWSER_CDP_URL` and `BROWSER_TOKEN`, not launch Chromium inside Pi. See the
-[Browserless guide](docs/browserless.md). Browserless is not needed for manual
-viewing in your host browser.
+Set `DEV_PORT=15173` in `.env` and run `make up` to change the host port.
+The app and Browserless still use port 5173 internally. Applying changes can
+recreate Pi and end active sessions.
 
-For another host port (for example, multiple Pi Box instances), set
-`DEV_PORT=15173` in private `.env`, then apply with `make up`. Open
-`http://localhost:15173`; the app and Browserless still use container port 5173.
-Applying port changes recreates Pi and ends active sessions, so finish work first.
-Existing installations must also apply this Compose change before the port is
-available. This port publishing applies to Compose, not Docker Sandboxes.
-
-**Viewing from another machine (e.g. ThinkPad → Mac over Tailscale):**
+For remote viewing, run on your client machine:
 
 ```bash
-# Run on the viewing machine; use your existing SSH hostname/alias for the Docker host.
 ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:5173:127.0.0.1:5173 your-mac-ssh-alias
 ```
 
-Keep that connection open and visit `http://localhost:5173` on the ThinkPad.
-`-N` opens only the tunnel; keep your normal Pi terminal connection separately.
-No Tailscale changes or SSH server in the container are needed, provided your
-existing host SSH access allows TCP forwarding. No Mac zsh alias changes are
-needed for local viewing. You can save the tunnel once in the ThinkPad's
-`~/.ssh/config` under a dedicated alias:
-
-```sshconfig
-Host pi-box-web
-    HostName your-mac-tailscale-name
-    User your-mac-user
-    LocalForward 127.0.0.1:5173 127.0.0.1:5173
-    ExitOnForwardFailure yes
-```
-
-Then run `ssh -N pi-box-web`. If the ThinkPad's port 5173 is occupied, change
-only the first port to 15173 and browse `http://localhost:15173`. If the Docker
-host uses a custom `DEV_PORT`, change the destination (last) port accordingly.
-Do not expose the dev server publicly or use Tailscale Serve/Funnel for this workflow.
+Keep the tunnel open and visit `http://localhost:5173`. For a custom `DEV_PORT`,
+change the destination port; change the first port if the client port is occupied.
 
 ### Optional services: PostgreSQL
 
@@ -240,7 +202,8 @@ POSTGRES_PASSWORD='your-private-password'
 
 Run `make up` to build and start the selected services. Pi connects to `postgres:5432` using the supplied `PG*` environment variables; no database port is published to the host. It has database administrator access, so keep this separate from production data. PostgreSQL has its own persistent volume; changing `.env` does not rotate an existing database password.
 
-Other development services can follow the same overlay pattern, with their own configuration and storage. Removing an overlay from the selection does not automatically stop its existing containers.
+Combine overlays by appending their filenames to `COMPOSE_FILE`. Stop a sidecar
+before removing its overlay; deselecting it alone leaves the container running.
 
 ### Optional services: Browserless Chromium
 
@@ -251,9 +214,9 @@ COMPOSE_FILE=compose.yaml:compose.browserless.yaml
 BROWSER_TOKEN='your-own-strong-private-token'
 ```
 
-Run `chmod 600 .env` and `make up`. Pi receives `BROWSER_CDP_URL` and `BROWSER_TOKEN`; install your own browser client in your project. To include PostgreSQL too, use `COMPOSE_FILE=compose.yaml:compose.postgres.yaml:compose.browserless.yaml` and also set `POSTGRES_PASSWORD`.
-
-The pinned upstream browser publishes no host ports and has no persistent storage. It uses **SSPL/commercial licensing** and disables Chromium's sandbox, so use it only for trusted development. See the [Browserless guide](docs/browserless.md) for client examples, session cleanup, licensing and security details.
+Run `chmod 600 .env` and `make up`. Pi receives `BROWSER_CDP_URL` and
+`BROWSER_TOKEN`. See the [Browserless guide](docs/browserless.md) for a client
+example and licensing/security details.
 
 ### Optional services: Phoenix tracing
 
@@ -263,15 +226,15 @@ Select Phoenix in your private `.env`:
 COMPOSE_FILE=compose.yaml:compose.phoenix.yaml
 ```
 
-Or append `:compose.phoenix.yaml` to an existing PostgreSQL/Browserless selection. Run `make up`, then follow the [Phoenix guide](docs/phoenix.md) to explicitly configure and install the pinned `pi-otel` exporter inside Pi Box. Starting the backend alone does not enable tracing or change Pi's default packages/settings.
-
-The unauthenticated UI binds only to host loopback at `http://localhost:6006`; traces persist in a project-scoped SQLite volume. **Full-content capture can retain prompts, code, tool results and secrets.** Review the guide's privacy, shutdown and deletion instructions before enabling it. Remote viewing uses SSH forwarding, not a public port.
+Run `make up`, then follow the [Phoenix guide](docs/phoenix.md) to install and
+configure `pi-otel`. The UI is at `http://localhost:6006`; traces persist in SQLite.
+**Full-content traces can retain prompts, code, tool results and secrets.**
 
 ### Tailscale
 
 Tailscale can provide private access to the Docker host or VM. Run it on the host and client, SSH to the host over your tailnet, then run `docker compose exec -it pi-box bash -l` from the repository directory and manage sessions yourself.
 
-No Tailscale daemon or SSH server is needed inside Pi-box. This uses ordinary SSH over Tailscale, not the separate Tailscale SSH feature; configure host SSH access and tailnet rules accordingly. The host must remain awake and online.
+The host must remain awake and online.
 
 ### Updating extensions
 
@@ -280,8 +243,6 @@ Bundled Pi and extension versions are pinned in [`container/package.json`](conta
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 
 Rebuilds retain persistent Pi settings, credentials and user-installed packages. Image-managed extension registrations are reconciled at startup; rebuilding does not reset your personal configuration.
-
-Very old installations using Compose services named `pi`/`db` must be stopped and migrated manually before starting the current services. Volumes predating `pi-box-packages.json` ownership tracking may need obsolete image-package registrations removed manually; startup no longer guesses which existing registrations it owns.
 
 ## Testing
 

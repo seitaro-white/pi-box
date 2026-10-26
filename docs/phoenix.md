@@ -50,9 +50,8 @@ pi install npm:pi-otel@0.3.0
 pi
 ```
 
-Both image variants support this setup. Settings and installation persist in the
-agent volume. Restart any already-running Pi processes to pick up the changes.
-Do **not** use `/otel start`; it launches a different backend.
+Settings and installation persist in the agent volume. Restart existing Pi
+processes to pick up changes. `/otel start` launches a different backend.
 
 ## View traces
 
@@ -60,9 +59,10 @@ Open **http://localhost:6006** on the host and select the `default` project.
 Use your overridden `PHOENIX_UI_PORT` if set. Run a conversation and tool call in
 Pi; exit Pi normally to flush pending spans, then allow a few seconds for ingestion.
 
-Phoenix stores its own copy of traces in a persistent SQLite volume (normally
-`pi-box_phoenix`). Its UI is bound to localhost. Metrics, logs and shell propagation
-are off with the configuration above.
+**Full-content capture stores prompts, code, tool results and potentially secrets.**
+Traces persist in Phoenix's SQLite volume (normally `pi-box_phoenix`); stopping the
+service retains them. The unauthenticated UI binds to host loopback; use SSH
+forwarding for remote access.
 
 If traces are missing:
 
@@ -81,15 +81,11 @@ host, run `docker compose stop phoenix` before removing `:compose.phoenix.yaml`
 from `.env`. Stopping Phoenix keeps its stored traces; removing the overlay alone
 does not disable the Pi exporter.
 
-## Further details
+## Tests and limitations
 
-Phoenix displays agent/LLM/tool spans and token usage, but its native cost totals
-are not populated by this setup. Historical compatibility investigations are recorded
-in the [validation notes](../plans/phoenix-observability-validation.md).
+Phoenix shows agent/LLM/tool spans and token usage, but native cost totals and
+cache-write token presentation are not populated by this setup.
 
-For repeatable integration acceptance against a prebuilt Pi image, run
-`npm run test:integration -- phoenix`. It installs the documented exporter in
-disposable storage, checks that a synthetic Pi workflow reaches Phoenix, and
-verifies trace storage survives backend recreation. Detailed exporter schema,
-token accounting and retry semantics belong to upstream tests, not this suite.
-See the [test guide](../tests/README.md) for isolation and cleanup behaviour.
+Run `npm run test:integration -- phoenix` against a prebuilt Pi image to check
+synthetic trace ingestion and storage persistence. See the
+[test guide](../tests/README.md).

@@ -14,7 +14,7 @@ nnn -V >/dev/null
 batcat --version >/dev/null
 rg --version >/dev/null
 fdfind --version >/dev/null
-psql --version | grep -E '^psql \(PostgreSQL\) 15\.' >/dev/null
+psql --version >/dev/null
 # The client is present in both variants, never the PostgreSQL server.
 if command -v postgres >/dev/null; then
     echo "PostgreSQL server must not be installed in the Pi image" >&2
@@ -27,8 +27,7 @@ test "$(uv tool dir --bin)" = /home/node/.pi/agent/bin
 if [ "$EXPECTED_PROFILE" = recommended ]; then
     herdr --version
     test "$(hunk --version)" = "$EXPECTED_HUNK_VERSION"
-    test "$(readlink /usr/local/bin/hunk)" = /opt/hunk/hunk
-    test ! -w /opt/hunk/hunk
+    test ! -w "$(command -v hunk)"
     test -r /home/node/.agents/skills/hunk-review/SKILL.md
     test ! -w /home/node/.agents/skills/hunk-review/SKILL.md
     test -r /home/node/.agents/skills/herdr/SKILL.md

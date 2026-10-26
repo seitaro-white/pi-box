@@ -1,148 +1,79 @@
 ---
 name: pi-box
 description: >-
-  Operate inside the Pi-box development environment: filesystem layout,
-  persistence, tool installation, optional sidecar connections, and
-  host/container boundaries. Use when starting web dev servers, forwarding
-  ports, taking screenshots, running browser tests through Browserless CDP,
-  troubleshooting the environment, installing tools, connecting to services,
-  or determining what survives a restart or replacement.
+  Operate inside Pi-box: filesystem and persistence, tool installation,
+  optional services, web dev servers, browser testing/screenshots over Browserless CDP,
+  and host/container boundaries. Use when doing any of these tasks, or any general task
+  that requires understanding of the system you are in.
 ---
 
-# Pi-box environment guide
+# Pi-box environment
 
-## Establish the current environment
+Compose runs as `node`, home `/home/node`, projects in `/workspace`.
+Check task-relevant tools and configuration: base/recommended images differ,
+and sidecars are optional. Inspect configuration without printing secrets.
 
-Pi-box normally runs as the non-root `node` user, with home directory
-`/home/node` and projects under `/workspace`.
+## Storage and tools
 
-There are multiple deployment modes and image variants. Treat this guide
-as the default architecture, not proof of the current configuration.
+| Persistent Compose path | Contents |
+|---|---|
+| `/workspace` | Projects |
+| `~/.pi/agent` | Pi settings, state and user packages |
+| `~/.config/git` | Git settings and HTTPS credentials |
+| `~/.herdr` | Herdr state |
 
-Before environment-specific work:
-- Check the current directory, user, and relevant installed tools.
-- Check only the environment variables needed for the task.
-- Distinguish a missing client, missing configuration, and unreachable
-  service before recommending changes.
-- Do not dump the environment, credential files, or connection URLs:
-  they may contain secrets.
+Other paths are container-local. uv Python/tool installs use the persistent agent
+volume; project dependencies belong in the project. Volume contents survive
+replacement, including file deletions. Docker Sandbox storage instead survives
+stop/start but is lost on deletion unless host-directory sharing is configured.
 
-The recommended image includes more tools and integrations than the base
-image. Optional sidecars are not necessarily enabled.
+Image builds, overlays, port publishing and container replacement are host-side
+operations from the Pi-box checkout. Replacement ends running sessions. The host
+home and Docker socket are not mounted by default.
 
-## Filesystem and persistence
+## Web development
 
-For the default Docker Compose deployment:
+Bind the app to `0.0.0.0:5173`; for Vite, save this in the dev script:
 
-| Location | Purpose | Survives container replacement? |
-|---|---|---|
-| `/workspace` | Projects and working files | Yes, in the workspace volume |
-| `/home/node/.pi/agent` | Pi state, settings and user packages | Yes, in the agent volume |
-| `/home/node/.config/git` | Git settings and HTTPS credentials | Yes, in the Git volume |
-| `/home/node/.herdr` | Herdr state | Yes, in the Herdr volume |
-| Other container paths | Image files and temporary/local changes | Do not assume so |
+```json
+"dev": "vite --host 0.0.0.0 --port 5173 --strictPort"
+```
 
-Persistence is not a backup. Deleting files in a mounted volume deletes
-the persistent copies too.
+| Client | App URL |
+|---|---|
+| Browserless | `http://pi-box:5173` |
+| Docker host browser | `http://localhost:5173` |
+| Remote browser | Forward host port over SSH, then open localhost |
 
-The optional Docker Sandbox deployment has different storage semantics:
-its default internal storage survives stop/start, but not sandbox deletion.
-Shared host-directory storage is an opt-in alternative. Confirm the
-deployment and mounts before promising that data will survive.
+Remote tunnel, run on the viewing machine:
 
-Do not assume the Pi-box source repository or its documentation is
-available inside the running container.
+```sh
+ssh -N -L 127.0.0.1:5173:127.0.0.1:5173 your-docker-host
+```
 
-## Host and container boundaries
+Host `.env` setting `DEV_PORT` changes only the published host port. Another
+container port needs a matching host-side mapping. These mappings are Compose-only.
 
-The default Compose container:
-- Runs without root privileges and with Linux capabilities dropped.
-- Does not mount the host home directory or Docker socket.
-- Can access mounted files and make outbound network requests.
-- Can therefore still damage project data or expose accessible secrets.
+## Optional services
 
-Do not assume `sudo`, Docker access, host paths, or host administration
-are available. Do not try to bypass isolation to complete a task.
-
-Building images, changing Compose overlays, publishing ports, and
-recreating containers are normally host-side operations. When needed,
-explain the required host action and give the user commands with an
-explicit working-directory requirement.
-
-Do not recommend container replacement without warning that it ends
-running sessions. Destructive volume operations require explicit approval.
-
-## Web development and port forwarding
-
-Run the project's web server on **`0.0.0.0:5173`** for the default Compose
-mapping. Save the binding in its normal dev script/config; for Vite:
-`"dev": "vite --host 0.0.0.0 --port 5173 --strictPort"`. If the project needs
-another port, ask for a matching host-side Compose mapping instead of silently
-changing the project's convention or falling back to an unpublished port.
-
-The browser sidecar and the user's browser are separate clients of the same app:
-- **Pi's Browserless browser:** open `http://pi-box:5173` over the Docker network.
-- **User on the Docker host:** open `http://localhost:5173`, published on host
-  loopback only. Host `.env` setting `DEV_PORT` changes this host port, not 5173
-  inside Pi.
-- **User on another machine:** forward the Docker host's loopback port through
-  their existing SSH connection, then open localhost there. For example, on the
-  viewing machine: `ssh -N -L 127.0.0.1:5173:127.0.0.1:5173 your-docker-host`.
-
-Port publishing is managed on the host; these mappings do not apply to Docker
-Sandboxes. Never claim visual review passed based only on an HTTP check.
-
-## Connecting to optional services
-
-Inside Compose, use service DNS names—not `localhost`.
-
-Connect directly using the supplied configuration, with a timeout. If it fails,
-distinguish missing configuration, a missing client and an unreachable service;
-report the failure without exposing credentials.
+Connect with bounded timeouts using supplied configuration. On failure, distinguish
+missing configuration, a missing client and an unreachable service.
 
 ### PostgreSQL
 
-- Default service address: `postgres:5432`.
-- Use the supplied `PG*` environment variables with `psql` or a client.
-- Do not print `PGPASSWORD` or embed credentials in command arguments.
-- No database port is published to the host by default.
-- The development account has database administrator privileges.
-
-Keep this separate from production data. Get approval before destructive
-database operations.
-
-PostgreSQL data lives in its own persistent volume. Changing the configured
-password does not rotate the password of an existing database.
+Use `psql` or a project client with the supplied `PG*` variables; default address
+is `postgres:5432`. This is a development administrator account with its own
+persistent volume. Changing `.env` does not rotate an existing database password.
 
 ### Browserless Chromium
 
-- Connect using `BROWSER_CDP_URL` and `BROWSER_TOKEN`; no separate health check
-  is needed. If they are missing, ask the user to enable the browser overlay.
-- Default service address: `browser:3000`; use the configured URL, not a guess.
-- The Pi image has no local Chromium or browser client. Missing Linux browser
-  libraries usually mean an incorrect local launch, not a broken sidecar.
-- Use `chromium.connectOverCDP()` (Python: `connect_over_cdp()`), never
-  `chromium.launch()` for this sidecar. Do not run `playwright install`, install
-  Linux browser libraries, or fall back to a local browser without approval.
-- Prefer the project's existing browser client. For Node projects without one,
-  `playwright-core` is sufficient; no downloaded browser is needed. Keep client
-  dependencies project-local and follow the project's dependency policy.
-- A small script run through the shell is the expected client workflow; no
-  dedicated browser tool is bundled. Python Playwright is also valid if already
-  available. Keep reusable checks in project scripts/tests; use temporary scripts
-  for one-off inspection and clean them up when done.
-- Treat the authenticated URL as a secret. Build it from environment variables
-  in the script; never hard-code tokens or pass authenticated URLs as shell args.
-  Do not echo raw connection errors/debug logs that may contain the URL.
-- Use bounded connect/navigation timeouts. Report a sanitized failure instead of
-  repeatedly installing browsers. The upstream default session limit is 30 seconds.
-- Browser `localhost` means the browser sidecar, not Pi. Visit Pi-served apps at
-  `http://pi-box:5173`; serve files over HTTP or use `page.setContent()` instead
-  of assuming Pi's `file://` paths are available to the browser.
-- Save screenshots to the project in `/workspace`; close owned contexts and
-  disconnect in `finally`. Browserless normally disposes sessions on disconnect.
+Use the project's browser client or install project-local `playwright-core`.
+Connect with `chromium.connectOverCDP()` (Python: `connect_over_cdp()`); Chromium
+runs in the sidecar, so local browser downloads and Linux browser libraries are
+unnecessary. Missing `BROWSER_CDP_URL`/`BROWSER_TOKEN` means the user needs to
+configure the browser overlay on the host.
 
-Minimal Node client (requires project-local `playwright-core`):
+Run a script from the project directory:
 
 ```javascript
 import { chromium } from 'playwright-core';
@@ -158,37 +89,32 @@ try {
   await page.goto('http://pi-box:5173', { timeout: 15_000 });
   await page.screenshot({ path: 'page.png', fullPage: true });
 } catch {
-  // Do not print the underlying exception: it can include the authenticated URL.
-  console.error('Browser check failed; inspect app and sidecar availability without logging credentials.');
+  console.error('Browser check failed; check app and sidecar availability.');
   process.exitCode = 1;
 } finally {
   try {
     try {
-      if (context) await context.close();
+      await context?.close();
     } finally {
-      if (browser) await browser.close();
+      await browser?.close();
     }
   } catch {
-    console.error('Browser cleanup failed (connection details omitted).');
+    console.error('Browser cleanup failed.');
     process.exitCode = 1;
   }
 }
 ```
 
-Run from the project directory so the artifact path is inside `/workspace`. Never claim visual review passed just because an HTTP request succeeded.
+Authenticated URLs and raw connection errors can expose tokens. Browser
+`localhost` and `file://` refer to the sidecar; serve Pi files over HTTP or use
+`page.setContent()`. Client-saved screenshots land in the project. Sessions default
+to 30 seconds and are disposed on disconnect. Inspect screenshots for visual review.
+The browser has no persistent storage; its disabled Chromium sandbox makes it
+suitable for trusted development only.
 
-The default service has no persistent storage and publishes no host port.
-It is intended for trusted development; upstream disables Chromium's
-sandbox. Do not treat it as a safe environment for hostile content.
+### Phoenix
 
-### Phoenix tracing
-
-- Default internal service address: `phoenix:6006`.
-- Starting Phoenix does not automatically enable Pi tracing.
-- Exporter installation and configuration are separate, explicit steps.
-- Do not enable full-content capture without user approval: traces can
-  retain prompts, code, tool results, and secrets.
-
-The Compose UI is exposed on the Docker host's loopback interface by
-default. A user's browser needs the host-side address or an SSH tunnel,
-not the internal Compose hostname.
+Internal address: `phoenix:6006`; host UI: `http://localhost:6006` (or forwarded
+host port). Tracing requires separate `pi-otel` installation and configuration.
+Full-content capture retains prompts, code, tool results and potentially secrets;
+enable it only at the user's request.

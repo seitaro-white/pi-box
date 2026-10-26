@@ -3,6 +3,11 @@
     "/opt/pi/node_modules/pi-subagents",
     "/opt/pi/node_modules/pi-web-access",
     "/opt/pi/node_modules/@narumitw/pi-usage",
-    "/opt/pi/node_modules/@narumitw/pi-lsp"
+    "/opt/pi/node_modules/@narumitw/pi-lsp",
+    "/opt/pi/node_modules/@juicesharp/rpiv-ask-user-question",
+    "/opt/pi/node_modules/@juicesharp/rpiv-todo",
+    "/opt/pi/node_modules/pi-stretchtext",
+    "/opt/pi/node_modules/pi-calm",
+    "/opt/pi/node_modules/personal-skills"
   ]
 }

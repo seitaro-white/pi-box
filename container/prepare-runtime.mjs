@@ -12,7 +12,7 @@ export const PI_PACKAGE = "@earendil-works/pi-coding-agent";
  * @param {object} manifest Authoritative runtime package manifest.
  * @param {"base" | "recommended"} profile Image variant to prepare.
  * @returns {{manifest: object, settings: {packages: string[]}}} Generated files.
- * @throws {Error} If the profile is invalid, Pi is missing, or versions are not exact.
+ * @throws {Error} If the profile is invalid, Pi is missing, or sources are not pinned.
  */
 export function prepareRuntime(manifest, profile) {
   if (!["base", "recommended"].includes(profile)) {
@@ -22,8 +22,10 @@ export function prepareRuntime(manifest, profile) {
     throw new Error("Runtime must include Pi");
   }
   for (const [name, version] of Object.entries(manifest.dependencies)) {
-    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-      throw new Error(`Use an exact version for ${name}`);
+    const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version);
+    const gitCommit = /^git\+https:\/\/github\.com\/[\w.-]+\/[\w.-]+\.git#[a-f0-9]{40}$/.test(version);
+    if (!exactVersion && !gitCommit) {
+      throw new Error(`Use an exact version or full Git commit for ${name}`);
     }
   }
 

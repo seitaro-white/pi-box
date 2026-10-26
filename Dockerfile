@@ -83,8 +83,11 @@ RUN UV_TOOL_DIR=/opt/ruff UV_TOOL_BIN_DIR=/usr/local/bin \
     UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_DOWNLOADS=never \
     uv tool install --no-cache --python /usr/local/bin/python3 "ruff==${RUFF_VERSION}"
 COPY container/package.json container/package-lock.json ./
+# npm can canonicalize GitHub Git sources to SSH; force anonymous HTTPS for builds.
 RUN node prepare-runtime.mjs recommended \
-    && npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
+    && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=url.https://github.com/.insteadOf \
+       GIT_CONFIG_VALUE_0=ssh://git@github.com/ \
+       npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
     && rm -rf /tmp/npm-cache \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome

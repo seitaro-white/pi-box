@@ -36,7 +36,17 @@ function assertCommittedRuntime(profile, expected) {
   for (const [name, version] of Object.entries(
     expected.manifest.dependencies,
   )) {
-    assert.equal(lock.packages[`node_modules/${name}`].version, version, name);
+    const installed = lock.packages[`node_modules/${name}`];
+    if (version.startsWith("git+")) {
+      // npm canonicalizes GitHub URLs to SSH; builds rewrite transport to HTTPS.
+      assert.equal(
+        installed.resolved.replace("git+ssh://git@github.com/", "git+https://github.com/"),
+        version,
+        name,
+      );
+    } else {
+      assert.equal(installed.version, version, name);
+    }
   }
   return lock;
 }
@@ -74,6 +84,23 @@ describe("runtime manifests", () => {
         ),
       /Use an exact version/,
     );
+  });
+
+  it("accepts full HTTPS Git commit pins but rejects floating refs", () => {
+    const gitSource = "git+https://github.com/example/skills.git#";
+    const manifest = (ref) => ({
+      dependencies: { [PI_PACKAGE]: "1.4.0", skills: gitSource + ref },
+    });
+    assert.deepEqual(
+      prepareRuntime(manifest("a".repeat(40)), "recommended").settings,
+      { packages: ["/opt/pi/node_modules/skills"] },
+    );
+    for (const ref of ["main", "v1.0.0", "abc1234", ""]) {
+      assert.throws(
+        () => prepareRuntime(manifest(ref), "recommended"),
+        /Use an exact version or full Git commit/,
+      );
+    }
   });
 
   it("supports manifests without CLI tools and rejects invalid tool declarations", () => {

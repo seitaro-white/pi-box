@@ -1,5 +1,6 @@
 // package.json is authoritative. Direct dependencies except Pi and piBox.npmTools
-// are bundled Pi packages. Derive manifests and registrations; never resolve versions.
+// are bundled Pi packages. Personal skills are added from Git at image build time.
+// Derive manifests and registrations; never resolve versions.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -45,14 +46,19 @@ export function prepareRuntime(manifest, profile) {
     manifest: {
       ...manifest,
       ...(profile === "base" && manifest.piBox
-        ? { piBox: { ...manifest.piBox, npmTools: [] } }
+        ? { piBox: { ...manifest.piBox, personalSkills: false, npmTools: [] } }
         : {}),
       dependencies,
     },
     settings: {
-      packages: Object.keys(dependencies)
-        .filter((name) => name !== PI_PACKAGE && !npmTools.includes(name))
-        .map((name) => `/opt/pi/node_modules/${name}`),
+      packages: [
+        ...Object.keys(dependencies)
+          .filter((name) => name !== PI_PACKAGE && !npmTools.includes(name))
+          .map((name) => `/opt/pi/node_modules/${name}`),
+        ...(profile === "recommended" && manifest.piBox?.personalSkills
+          ? ["/opt/pi/node_modules/personal-skills"]
+          : []),
+      ],
     },
   };
 }

@@ -132,7 +132,9 @@ The default image includes:
 
 The recommended image bundles my [personal development skills](https://github.com/seitaro-white/personal-agent-skills) as a Pi package, including planning, review and cleanup workflows. Skills are project- and team-specific: treat these as starting points to adapt, not universal rules. It also includes the tool-specific `herdr` and `hunk-review` skills, which teach Pi how to control Herdr panes and interact with live Hunk review sessions.
 
-The personal skills and `pi-calm` repositories are pinned to full Git commits and installed into the image alongside npm packages. These repositories must be public for credential-free builds; running a prebuilt image does not require GitHub access. No GitHub token is baked into the image.
+The personal skills are fetched from `main` on each recommended or sandbox image build, independently of npm and its lockfile. Docker's BuildKit Git `ADD` resolves the branch on each build and reuses the cached contents only when the commit is unchanged. Use `make up` to rebuild and replace the Compose container; restarting an existing container does not update its skills. No startup pulls or runtime GitHub access are needed.
+
+The `pi-calm` repository remains pinned to a full Git commit. Both repositories must be public for credential-free builds. No GitHub token is baked into the image.
 
 
 
@@ -244,7 +246,7 @@ The host must remain awake and online.
 
 ### Updating extensions
 
-Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json); Ruff is pinned separately in the `Dockerfile`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
+Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff is pinned separately in the `Dockerfile`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 

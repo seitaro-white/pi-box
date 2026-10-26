@@ -30,6 +30,8 @@ runCommand("docker", [
       const expected = Object.keys(manifest.dependencies)
         .filter((name) => name !== "@earendil-works/pi-coding-agent" && !manifest.piBox.npmTools.includes(name))
         .map((name) => "/opt/pi/node_modules/" + name);
+      if (manifest.piBox.personalSkills) expected.push("/opt/pi/node_modules/personal-skills");
+      assert.equal(read("/opt/pi/node_modules/personal-skills/package.json").name, "personal-skills");
       const actual = read(homedir() + "/.pi/agent/settings.json").packages
         .map((item) => typeof item === "string" ? item : item.source);
       assert.deepEqual(actual.sort(), expected.sort());

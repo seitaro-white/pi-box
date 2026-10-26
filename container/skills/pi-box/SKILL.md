@@ -3,7 +3,8 @@ name: pi-box
 description: >-
   Operate inside Pi-box: filesystem and persistence, tool installation,
   optional services, web dev servers, browser testing/screenshots over Browserless CDP,
-  and host/container boundaries.
+  and host/container boundaries. Use when doing any of these tasks, or any general task
+  that requires understanding of the system you are in.
 ---
 
 # Pi-box environment

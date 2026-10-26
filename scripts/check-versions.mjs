@@ -61,6 +61,9 @@ export async function latestVersion(name) {
 export async function checkVersions(manifest, lookup = latestVersion) {
   return Promise.all(
     manifestEntries(manifest).map(async (entry) => {
+      if (entry.pinned.startsWith("git+")) {
+        return { ...entry, latest: "—", status: "git-pinned" };
+      }
       try {
         const latest = await lookup(entry.name);
         return {
@@ -102,7 +105,7 @@ async function main() {
     console.log(format(row));
   }
   console.log(
-    "\nRead-only: latest means the npm latest dist-tag; different does not necessarily mean newer.",
+    "\nRead-only: latest means the npm latest dist-tag; different does not necessarily mean newer. Git commit pins are not checked against upstream.",
   );
   for (const row of rows.filter((row) => row.error)) {
     console.error(`${row.name}: ${row.error}`);

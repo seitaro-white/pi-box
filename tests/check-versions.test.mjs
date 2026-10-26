@@ -20,6 +20,17 @@ test("reads dependencies and labels overrides separately", () => {
   );
 });
 
+test("reports Git pins without looking them up on npm", async () => {
+  const source = "git+https://github.com/example/skills.git#" + "a".repeat(40);
+  const rows = await checkVersions(
+    { dependencies: { skills: source } },
+    async () => { throw new Error("Git packages must not query npm"); },
+  );
+  assert.deepEqual(rows, [
+    { name: "skills", pinned: source, kind: "dependency", latest: "—", status: "git-pinned" },
+  ]);
+});
+
 test("reports matches, differences and failures without changing the manifest", async () => {
   const manifest = {
     dependencies: { same: "1.0.0", changed: "2.0.0", failed: "1.0.0" },

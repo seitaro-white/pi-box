@@ -52,7 +52,14 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
       `package presence for ${name}`,
     );
     if (profile === "recommended") {
-      assert.equal(readJson(path).version, expected[name], name);
+      const pin = expected[name];
+      if (pin.startsWith("git+")) {
+        const locked = readJson("/opt/pi/package-lock.json").packages[`node_modules/${name}`];
+        assert.equal(locked.resolved.replace("git+ssh://git@github.com/", "git+https://github.com/"), pin, name);
+        assert.equal(readJson(path).version, locked.version, name);
+      } else {
+        assert.equal(readJson(path).version, pin, name);
+      }
     }
   }
 
@@ -118,6 +125,8 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     ["pi-subagents", "subagent"],
     ["pi-web-access", "fetch_content"],
     ["@narumitw/pi-lsp", "lsp_diagnostics"],
+    ["@juicesharp/rpiv-ask-user-question", "ask_user_question"],
+    ["@juicesharp/rpiv-todo", "todo"],
   ]) {
     assert.equal(tools.has(name), bundled.has(packageName), `tool ${name}`);
   }
@@ -128,8 +137,10 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
         (extension) =>
           extension.resolvedPath === `/opt/pi/node_modules/${name}` ||
           extension.resolvedPath.startsWith(`/opt/pi/node_modules/${name}/`),
+      ) || loader.getSkills().skills.some(
+        (skill) => skill.filePath.startsWith(`/opt/pi/node_modules/${name}/`),
       ),
-      `extension from ${name}`,
+      `extension or skill from ${name}`,
     );
   }
   assert.equal(
@@ -137,6 +148,18 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     bundled.has("@narumitw/pi-usage"),
     "/usage command",
   );
+  assert.equal(
+    loaded.some((extension) => extension.commands.has("calm")),
+    bundled.has("pi-calm"),
+    "/calm command",
+  );
+  for (const name of ["create-plan", "review-changes", "clean-up"]) {
+    assert.equal(
+      loader.getSkills().skills.some((skill) => skill.name === name),
+      bundled.has("personal-skills"),
+      `personal skill ${name}`,
+    );
+  }
   for (const command of ["ruff", "biome"]) {
     const result = spawnSync(command, ["--version"], { encoding: "utf8" });
     if (profile === "base") {

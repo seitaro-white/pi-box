@@ -6,11 +6,16 @@
   "description": "Pi Box development runtime with Pi extensions",
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.4.0",
-    "pi-subagents": "0.81.0",
+    "pi-subagents": "0.82.1",
     "pi-web-access": "0.44.0",
-    "@narumitw/pi-usage": "0.68.0",
+    "@narumitw/pi-usage": "0.68.1",
     "@narumitw/pi-lsp": "0.49.10",
-    "@biomejs/biome": "2.6.2"
+    "@biomejs/biome": "2.6.3",
+    "@juicesharp/rpiv-ask-user-question": "2.15.0",
+    "@juicesharp/rpiv-todo": "2.15.0",
+    "pi-stretchtext": "0.1.0",
+    "pi-calm": "git+https://github.com/JesseZhang97/pi-calm.git#d4ae210f05e1d6b8157172c6769be73b8ea533f9",
+    "personal-skills": "git+https://github.com/seitaro-white/personal-agent-skills.git#dd705f7a79dc17d866548a3518c0a26c039d601e"
   },
   "piBox": {
     "npmTools": [

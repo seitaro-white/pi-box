@@ -102,6 +102,32 @@ describe("runtime manifests", () => {
     }
   });
 
+  it("installs Claude Code as a CLI rather than a Pi extension", () => {
+    assert.ok(source.piBox.npmTools.includes("@anthropic-ai/claude-code"));
+    assert.ok(!extensions.includes("@anthropic-ai/claude-code"));
+    for (const file of ["Dockerfile", "sandbox/pi-box.dockerfile"]) {
+      const dockerfile = readFileSync(join(root, file), "utf8");
+      // npm scripts stay disabled globally; only Claude's binary setup is run.
+      assert.ok(dockerfile.includes("node node_modules/@anthropic-ai/claude-code/install.cjs"));
+      assert.ok(dockerfile.includes("node_modules/.bin/claude --version"));
+      assert.ok(dockerfile.includes("ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude"));
+    }
+  });
+
+  it("pins the same ty version in recommended and sandbox images", () => {
+    const dockerfiles = ["Dockerfile", "sandbox/pi-box.dockerfile"].map(
+      (file) => readFileSync(join(root, file), "utf8"),
+    );
+    const version = dockerfiles[0].match(/^ARG TY_VERSION=(\d+\.\d+\.\d+)$/m)?.[1];
+    assert.ok(version, "ty must have an exact version pin");
+    for (const dockerfile of dockerfiles) {
+      assert.ok(dockerfile.includes(`ARG TY_VERSION=${version}\n`));
+      assert.ok(dockerfile.includes("UV_TOOL_DIR=/opt/ty UV_TOOL_BIN_DIR=/usr/local/bin"));
+      assert.ok(dockerfile.includes('uv tool install --no-cache --python /usr/local/bin/python3 "ty==${TY_VERSION}"'));
+    }
+    assert.ok(dockerfiles[0].indexOf("ARG TY_VERSION=") > dockerfiles[0].indexOf("FROM common AS recommended"));
+  });
+
   it("accepts full HTTPS Git commit pins but rejects floating refs", () => {
     const gitSource = "git+https://github.com/example/skills.git#";
     const manifest = (ref) => ({

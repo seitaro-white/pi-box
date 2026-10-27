@@ -107,15 +107,16 @@ The default image includes:
 - **Standard development tools:** Bash, Git, curl, ripgrep, fd (`fdfind` on Debian).
 - **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
-- **Python, uv and Ruff**
+- **Python, uv, Ruff and [ty](https://docs.astral.sh/ty/)** — Ruff provides Python linting/fixes; ty provides type checking (`ty check`) and LSP diagnostics.
 - **Node.js, npm and Biome**
+- **[Claude Code CLI](https://code.claude.com/docs/)** (recommended and sandbox images) — run `claude` directly or `claude auth login` to authenticate for Claude Code and the bridge. The default Compose mounts do not persist `~/.claude` or `~/.claude.json` across container replacement.
 - **PostgreSQL client (`psql`)**
 
 
 - **Pi Extensions**
     - **`pi-subagents`** — spin up and delegate to subagents for parallel agent workflows.
     - **`pi-web-access`** — simple web access/search - useful to have this as a capability separate from any given model provider.
-    - **`@narumitw/pi-lsp`** — Gives Pi access to the Ruff & Biome toolchain - you can catch a surprising number of issues in AI-generated code with good old-fashioned linting before you even get to agent reviews.
+    - **`@narumitw/pi-lsp`** — Gives Pi access to the Ruff, ty & Biome toolchain - you can catch a surprising number of issues in AI-generated code with good old-fashioned linting before you even get to agent reviews.
     - **`@narumitw/pi-usage`** — Usage dashboard for subscription based coding plans.
     - **`@juicesharp/rpiv-ask-user-question`** — structured questions with selectable answers.
     - **`@juicesharp/rpiv-todo`** — task tracking for multi-step work.
@@ -128,6 +129,8 @@ The default image includes:
     - **PostgreSQL Server** - Optional local database server intended for development/testing, not production.
     - **Browserless Chromium** - Optional headless browser accessed over CDP; trusted development only, with SSPL/commercial licensing and Chromium's sandbox disabled upstream.
     - **Arize Phoenix** - Optional local trace viewer with SQLite storage. Requires explicit installation/configuration of `pi-otel`; full-content traces can retain private data and secrets.
+
+Python files (`.py` and `.pyi`) automatically route to both Ruff and ty through pi-lsp's built-in catalog; no extra configuration is needed. `/lsp` shows command availability. A custom `pi-lsp.json` replaces that catalog, so existing custom configurations must include `{"ty":{"command":["ty","server"],"extensions":[".py",".pyi"]}}` alongside their other servers to enable ty.
 
 ### What about skills?
 
@@ -143,7 +146,7 @@ The `pi-calm` repository remains pinned to a full Git commit. Both repositories 
 
 ### Base image
 
-The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, Hunk (including its skill), the bundled Pi extensions, Ruff and Biome. To select it, set these overrides in your local `.env` before building:
+The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, Hunk (including its skill), the bundled Pi extensions, Claude Code CLI, Ruff, ty and Biome. To select it, set these overrides in your local `.env` before building:
 
 ```dotenv
 TARGET=base
@@ -247,7 +250,7 @@ The host must remain awake and online.
 
 ### Updating extensions
 
-Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff is pinned separately in the `Dockerfile`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
+Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff and ty are pinned separately in `Dockerfile` and `sandbox/pi-box.dockerfile`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 

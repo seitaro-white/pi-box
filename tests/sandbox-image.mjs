@@ -20,7 +20,9 @@ runCommand("docker", [
     test "$(uv tool dir)" = "$HOME/.local/share/uv/tools"
     test "$(uv tool dir --bin)" = "$HOME/.local/bin"
     ruff --version
+    ty --version
     biome --version
+    claude --version
     node --input-type=module -e '
       import assert from "node:assert/strict";
       import { readFileSync } from "node:fs";

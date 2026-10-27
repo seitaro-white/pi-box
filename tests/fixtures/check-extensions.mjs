@@ -165,7 +165,7 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
       `personal skill ${name}`,
     );
   }
-  for (const command of ["ruff", "biome"]) {
+  for (const command of ["ruff", "ty", "biome", "claude"]) {
     const result = spawnSync(command, ["--version"], { encoding: "utf8" });
     if (profile === "base") {
       assert.equal(result.error?.code, "ENOENT", `${command} absent from base`);
@@ -174,6 +174,7 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     }
   }
   assert.equal(existsSync("/opt/ruff"), profile === "recommended");
+  assert.equal(existsSync("/opt/ty"), profile === "recommended");
   if (profile === "recommended") {
     const directory = mkdtempSync(join(tmpdir(), "pi-box-lsp-"));
     t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -200,6 +201,8 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     const python = join(directory, "demo.py");
     writeFileSync(python, "import os\n");
     assert.match(await diagnostics("ruff", python), /F401/);
+    writeFileSync(python, 'value: int = "not an integer"\n');
+    assert.match(await diagnostics("ty", python), /invalid-assignment/);
     const javascript = join(directory, "demo.mjs");
     writeFileSync(javascript, "let value = 1;\nconsole.log(value);\n");
     assert.match(await diagnostics("biome", javascript), /useConst/);

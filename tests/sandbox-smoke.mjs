@@ -18,7 +18,9 @@ pi --version
 python3 --version
 uv --version
 ruff --version
+ty --version
 biome --version
+claude --version
 tmux -V
 node --input-type=module -e '
   import assert from "node:assert/strict";

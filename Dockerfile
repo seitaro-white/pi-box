@@ -83,6 +83,10 @@ ARG RUFF_VERSION=0.17.0
 RUN UV_TOOL_DIR=/opt/ruff UV_TOOL_BIN_DIR=/usr/local/bin \
     UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_DOWNLOADS=never \
     uv tool install --no-cache --python /usr/local/bin/python3 "ruff==${RUFF_VERSION}"
+ARG TY_VERSION=0.0.92
+RUN UV_TOOL_DIR=/opt/ty UV_TOOL_BIN_DIR=/usr/local/bin \
+    UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_DOWNLOADS=never \
+    uv tool install --no-cache --python /usr/local/bin/python3 "ty==${TY_VERSION}"
 COPY container/package.json container/package-lock.json ./
 # npm can canonicalize GitHub Git sources to SSH; force anonymous HTTPS for builds.
 RUN node prepare-runtime.mjs recommended \
@@ -90,8 +94,11 @@ RUN node prepare-runtime.mjs recommended \
        GIT_CONFIG_VALUE_0=ssh://git@github.com/ \
        npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
     && rm -rf /tmp/npm-cache \
+    && node node_modules/@anthropic-ai/claude-code/install.cjs \
+    && node_modules/.bin/claude --version \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
-    && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome
+    && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome \
+    && ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude
 # BuildKit resolves main on every build and keys the cache by its commit.
 # Keep the old package path so existing settings and resource filters still work.
 ADD https://github.com/seitaro-white/personal-agent-skills.git#main /opt/pi/node_modules/personal-skills/

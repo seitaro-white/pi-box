@@ -1,9 +1,10 @@
 // The core user workflow owns storage persistence and replacement acceptance.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { withComposeProject } from "./helpers/compose-project.mjs";
+import { waitFor } from "./helpers/acceptance.mjs";
+import { composeSuite } from "./helpers/compose-project.mjs";
 
-await withComposeProject({ name: "compose" }, async (p) => {
+composeSuite("Compose workflow", { name: "compose" }, (p, step) => {
   const inspect = () => p.inspect(p.project);
   const exec = (args) => p.compose(["exec", "-T", "pi-box", ...args]);
   const fixture = (file) => p.compose([
@@ -29,54 +30,62 @@ await withComposeProject({ name: "compose" }, async (p) => {
     assert.throws(() => p.make(target), pattern);
     assert.equal(inspect().Id, before, "refusal must leave the existing container intact");
   };
+  let initial;
 
-  p.make("up");
-  fixture("seed-storage.mjs");
-  assertState();
+  step("make up starts a private, healthy container with seeded storage", () => {
+    p.make("up");
+    fixture("seed-storage.mjs");
+    assertState();
+  });
 
-  // A one-request server verifies real host-to-container HTTP, without app dependencies.
-  p.compose(["exec", "-T", "-d", "pi-box", "node", "-e", `
-    const server = require('node:http').createServer((req, res) => {
-      res.end('pi-box-dev-port', () => server.close());
-    });
-    server.listen(5173, '0.0.0.0');
-    setTimeout(() => process.exit(1), 30000).unref();
-  `]);
-  const bindings = inspect().NetworkSettings.Ports["5173/tcp"];
-  assert.equal(bindings.length, 1);
-  assert.equal(bindings[0].HostIp, "127.0.0.1");
-  const url = `http://127.0.0.1:${bindings[0].HostPort}`;
-  let response;
-  for (let attempt = 0; attempt < 30; attempt++) {
-    try {
-      response = await fetch(url, { signal: AbortSignal.timeout(1000) });
-      break;
-    } catch (error) {
-      if (attempt === 29) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-  assert.equal(response.status, 200);
-  assert.equal(await response.text(), "pi-box-dev-port");
+  step("the dev port serves host HTTP on loopback only", async () => {
+    // A one-request server verifies real host-to-container HTTP, without app dependencies.
+    p.compose(["exec", "-T", "-d", "pi-box", "node", "-e", `
+      const server = require('node:http').createServer((req, res) => {
+        res.end('pi-box-dev-port', () => server.close());
+      });
+      server.listen(5173, '0.0.0.0');
+      setTimeout(() => process.exit(1), 30000).unref();
+    `]);
+    const bindings = inspect().NetworkSettings.Ports["5173/tcp"];
+    assert.equal(bindings.length, 1);
+    assert.equal(bindings[0].HostIp, "127.0.0.1");
+    const response = await waitFor(
+      () => fetch(`http://127.0.0.1:${bindings[0].HostPort}`, { signal: AbortSignal.timeout(1000) }),
+      { intervalMs: 100, message: "Dev server did not respond" },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "pi-box-dev-port");
+  });
 
-  const initial = inspect().Id;
-  p.make("up");
-  assert.equal(inspect().Id, initial, "unchanged up must not replace sessions");
+  step("an unchanged make up keeps the running container", () => {
+    initial = inspect().Id;
+    p.make("up");
+    assert.equal(inspect().Id, initial, "unchanged up must not replace sessions");
+  });
 
-  p.make("replace");
-  assert.notEqual(inspect().Id, initial);
-  assertState();
+  step("make replace recreates the container and keeps storage", () => {
+    p.make("replace");
+    assert.notEqual(inspect().Id, initial);
+    assertState();
+  });
 
-  exec(["sh", "-c", "printf SYNTHETIC > /home/node/.gitconfig"]);
-  for (const target of ["up", "replace"]) refuse(target, /non-persistent/);
-  exec(["rm", "/home/node/.gitconfig"]);
-  p.compose(["stop", "pi-box"]);
-  refuse("replace", /Start .* first/);
-  p.compose(["start", "--wait", "--wait-timeout", "60", "pi-box"]);
-  assertState();
+  step("replacement refuses while non-persistent Git config exists", () => {
+    exec(["sh", "-c", "printf SYNTHETIC > /home/node/.gitconfig"]);
+    for (const target of ["up", "replace"]) refuse(target, /non-persistent/);
+    exec(["rm", "/home/node/.gitconfig"]);
+  });
 
-  p.compose(["down"]); // No -v: the replacement must reuse the seeded storage.
-  p.make("up");
-  assertState();
-  console.log("PASS: Loopback dev-server HTTP, Compose startup, idempotence, replacement guards and private storage across restart/recreation.");
+  step("replacement refuses a stopped container", () => {
+    p.compose(["stop", "pi-box"]);
+    refuse("replace", /Start .* first/);
+    p.compose(["start", "--wait", "--wait-timeout", "60", "pi-box"]);
+    assertState();
+  });
+
+  step("storage survives compose down and make up", () => {
+    p.compose(["down"]); // No -v: the replacement must reuse the seeded storage.
+    p.make("up");
+    assertState();
+  });
 });

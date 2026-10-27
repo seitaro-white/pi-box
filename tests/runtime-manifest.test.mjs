@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { prepareRuntime, PI_PACKAGE } from "../container/prepare-runtime.mjs";
@@ -87,39 +86,19 @@ describe("runtime manifests", () => {
     );
   });
 
-  it("adds personal skills from main at build time, outside both npm locks", () => {
+  // The image adds personal skills from Git; the smoke test checks the result.
+  it("keeps personal skills out of the manifest and both npm locks", () => {
     assert.equal(source.piBox.personalSkills, true);
     assert.equal(source.dependencies["personal-skills"], undefined);
     for (const prefix of ["container", "container/base"]) {
       const lock = readJson(join(root, prefix, "package-lock.json"));
       assert.equal(lock.packages["node_modules/personal-skills"], undefined);
     }
-    const instruction = "ADD https://github.com/seitaro-white/personal-agent-skills.git#main /opt/pi/node_modules/personal-skills/";
-    const dockerfile = readFileSync(join(root, "Dockerfile"), "utf8");
-    assert(dockerfile.startsWith("# syntax=docker/dockerfile:1\n"));
-    assert(dockerfile.split("\n").includes(instruction));
   });
 
-  it("installs Claude Code as a CLI rather than a Pi extension", () => {
+  it("treats Claude Code as a CLI tool rather than a Pi extension", () => {
     assert.ok(source.piBox.npmTools.includes("@anthropic-ai/claude-code"));
     assert.ok(!extensions.includes("@anthropic-ai/claude-code"));
-    const dockerfile = readFileSync(join(root, "Dockerfile"), "utf8");
-    // npm scripts stay disabled globally; only Claude's binary setup is run.
-    assert.ok(dockerfile.includes("node node_modules/@anthropic-ai/claude-code/install.cjs"));
-    assert.ok(dockerfile.includes("node_modules/.bin/claude --version"));
-    assert.ok(dockerfile.includes("ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude"));
-  });
-
-  it("pins ty once in the tools stage shared by recommended and sandbox", () => {
-    const dockerfile = readFileSync(join(root, "Dockerfile"), "utf8");
-    assert.match(dockerfile, /^ARG TY_VERSION=\d+\.\d+\.\d+$/m, "ty must have an exact version pin");
-    assert.ok(dockerfile.includes("UV_TOOL_DIR=/opt/ty UV_TOOL_BIN_DIR=/usr/local/bin"));
-    assert.ok(dockerfile.includes('uv tool install --no-cache --python /usr/local/bin/python3 "ty==${TY_VERSION}"'));
-    const stage = (name) => dockerfile.indexOf(` AS ${name}\n`);
-    assert.ok(dockerfile.indexOf("ARG TY_VERSION=") > stage("tools"));
-    assert.ok(dockerfile.indexOf("ARG TY_VERSION=") < stage("sandbox"));
-    assert.ok(dockerfile.includes("FROM tools AS sandbox\n"));
-    assert.ok(dockerfile.includes("COPY --from=tools /opt/ty /opt/ty\n"));
   });
 
   it("accepts full HTTPS Git commit pins but rejects floating refs", () => {

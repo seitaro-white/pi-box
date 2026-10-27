@@ -1,27 +1,34 @@
 // Authenticated browser access from Pi; all resources belong to this test.
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { withComposeProject } from "./helpers/compose-project.mjs";
+import { composeSuite } from "./helpers/compose-project.mjs";
 
-await withComposeProject({
+composeSuite("Browserless sidecar", {
   name: "browserless",
   overlays: ["compose.browserless.yaml"],
-}, async (p) => {
-  const config = p.config();
-  assert.equal(config.services.browser.ports, undefined);
-  assert.ok(config.services.browser.environment.TOKEN === p.settings.BROWSER_TOKEN);
-  assert.ok(config.services["pi-box"].environment.BROWSER_TOKEN === p.settings.BROWSER_TOKEN);
-  p.make("up");
-  const browser = p.inspect(p.compose(["ps", "--quiet", "browser"]));
-  assert.equal(browser.State.Health.Status, "healthy");
-  assert.deepEqual(browser.HostConfig.PortBindings || {}, {});
-  p.compose(["cp", join(p.root, "tests/fixtures/browserless"), "pi-box:/tmp/browserless-client"]);
-  p.compose(["exec", "-T", "pi-box", "cp", "-R", "/tmp/browserless-client", "/workspace/browserless-client"]);
-  p.compose([
-    "exec", "-T", "-w", "/workspace/browserless-client", "pi-box",
-    "npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund",
+}, (p, step) => {
+  const inClient = (args) => p.compose([
+    "exec", "-T", "-w", "/workspace/browserless-client", "pi-box", ...args,
   ]);
-  console.log(p.compose([
-    "exec", "-T", "-w", "/workspace/browserless-client", "pi-box", "node", "check.mjs",
-  ]));
+
+  step("configuration shares the token and publishes no browser port", () => {
+    const config = p.config();
+    assert.equal(config.services.browser.ports, undefined);
+    assert.ok(config.services.browser.environment.TOKEN === p.settings.BROWSER_TOKEN);
+    assert.ok(config.services["pi-box"].environment.BROWSER_TOKEN === p.settings.BROWSER_TOKEN);
+  });
+
+  step("make up starts a healthy, unpublished browser", () => {
+    p.make("up");
+    const browser = p.inspect(p.compose(["ps", "--quiet", "browser"]));
+    assert.equal(browser.State.Health.Status, "healthy");
+    assert.deepEqual(browser.HostConfig.PortBindings || {}, {});
+  });
+
+  step("Pi drives a page it serves over authenticated CDP", () => {
+    p.compose(["cp", join(p.root, "tests/fixtures/browserless"), "pi-box:/tmp/browserless-client"]);
+    p.compose(["exec", "-T", "pi-box", "cp", "-R", "/tmp/browserless-client", "/workspace/browserless-client"]);
+    inClient(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]);
+    console.log(inClient(["node", "check.mjs"]));
+  });
 });

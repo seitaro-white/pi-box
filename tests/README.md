@@ -39,6 +39,13 @@ CI uses the same selection on native AMD64/ARM64. Override image names with
 `tests/sandbox-smoke.mjs` is a **manual check of an existing sandbox**; its optional
 restart ends running sessions. See the [sandbox guide](../docs/sandboxes.md).
 
+## Writing acceptance suites
+
+Acceptance files use `node:test` through `composeSuite` (Compose projects) or
+`acceptanceSuite` (other disposable resources) in `helpers/`. Steps run in order
+against shared resources; after a failure the remaining steps are skipped, so the
+report names the first broken behaviour. Use `waitFor` for readiness polling.
+
 ## Isolation and failures
 
 Docker acceptance uses temporary projects, synthetic credentials, isolated volumes

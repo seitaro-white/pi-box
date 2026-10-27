@@ -1,7 +1,13 @@
 # syntax=docker/sandbox-kit:3
 schemaVersion: "3"
 kind: workload
-dockerfile: sandbox/pi-box.dockerfile
+dockerfile: Dockerfile
+# Kit v3 has no target field; this build argument selects the Dockerfile stage.
+args:
+  target:
+    default: sandbox
+    enum: [sandbox]
+    buildArg: PI_BOX_TARGET
 displayName: Pi Box
 description: Persistent mountless Pi development environment with in-sandbox Codex login
 capabilities:

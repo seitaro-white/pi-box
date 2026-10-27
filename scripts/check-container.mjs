@@ -114,16 +114,9 @@ export function checkContainer() {
         `${container} is not managed by this Compose project/service. Handle it manually; refusing replacement.`,
       );
     }
-    // A pre-Herdr container may gain the new volume, but never change old mounts.
-    const addingHerdr = !existing.Mounts.some(
-      (mount) => mount.Destination === "/home/node/.herdr",
-    );
-    const previousVolumes = addingHerdr
-      ? volumes.filter((volume) => volume.destination !== "/home/node/.herdr")
-      : volumes;
     if (
-      existing.Mounts.length !== previousVolumes.length ||
-      !previousVolumes.every((expected) =>
+      existing.Mounts.length !== volumes.length ||
+      !volumes.every((expected) =>
         existing.Mounts.some(
           (actual) =>
             actual.Type === "volume" &&
@@ -143,13 +136,7 @@ export function checkContainer() {
       );
     }
     docker(["exec", "-i", container, "sh", "-s"], {
-      // Do not hide unmounted Herdr data behind the new volume on replacement.
-      input: (addingHerdr ? `
-if [ -e /home/node/.herdr ] || [ -L /home/node/.herdr ]; then
-    echo 'Refusing replacement: non-persistent /home/node/.herdr exists. Preserve it manually first.' >&2
-    exit 1
-fi
-` : "") + readFileSync(
+      input: readFileSync(
         new URL("./check-disposable-files.sh", import.meta.url),
         "utf8",
       ),

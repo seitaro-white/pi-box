@@ -8,7 +8,7 @@ npm test                         # Node built-ins only; no Docker or npm install
 # Build images before acceptance:
 docker build --target base -t pi-box:0.2.0-base .
 docker build --target recommended -t pi-box:0.2.0 .
-docker build -f sandbox/pi-box.dockerfile -t pi-box:0.2.0-sandbox .
+docker build --target sandbox -t pi-box:0.2.0-sandbox .
 npm run test:integration
 
 # Select suites:

@@ -25,7 +25,7 @@ test "$(uv python dir)" = /home/node/.pi/agent/python
 test "$(uv tool dir)" = /home/node/.pi/agent/uv-tools
 test "$(uv tool dir --bin)" = /home/node/.pi/agent/bin
 if [ "$EXPECTED_PROFILE" = recommended ]; then
-    herdr --version
+    test "$(herdr --version)" = "herdr $EXPECTED_HERDR_VERSION"
     test "$(hunk --version)" = "$EXPECTED_HUNK_VERSION"
     test ! -w "$(command -v hunk)"
     test -r /home/node/.agents/skills/hunk-review/SKILL.md

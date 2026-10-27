@@ -37,6 +37,9 @@ async function runSmoke() {
         ),
       )
     );
+  const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  /** Read a pinned build argument's default. @param {string} name ARG name. */
+  const dockerArg = (name) => dockerfile.match(new RegExp(`^ARG ${name}=(.+)$`, "m"))[1];
 
   /** @type {string[]} */
   const createdVolumes = [];
@@ -166,7 +169,8 @@ async function runSmoke() {
     fixture("check-identity.sh", [
       `EXPECTED_PI_VERSION=${manifest.dependencies["@earendil-works/pi-coding-agent"]}`,
       `EXPECTED_PROFILE=${profile}`,
-      `EXPECTED_HUNK_VERSION=${readFileSync(new URL("../Dockerfile", import.meta.url), "utf8").match(/^ARG HUNK_VERSION=(.+)$/m)[1]}`,
+      `EXPECTED_HUNK_VERSION=${dockerArg("HUNK_VERSION")}`,
+      `EXPECTED_HERDR_VERSION=${dockerArg("HERDR_VERSION")}`,
     ]);
     fixture("check-extensions.mjs", [
       "PI_OFFLINE=1",

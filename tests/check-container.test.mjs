@@ -110,12 +110,7 @@ console.log(typeof output === "string" ? output : JSON.stringify(output));
 for (const [scenario, change, error] of [
   ["fresh", (fixture) => { fixture.names = []; fixture.owned = []; }],
   ["normal", () => {}],
-  ["add Herdr volume", (fixture) => { fixture.existing[0].Mounts.pop(); }],
-  [
-    "unmounted Herdr data",
-    (fixture) => { fixture.existing[0].Mounts.pop(); fixture.unsafePath = ".herdr"; },
-    /non-persistent.*herdr/,
-  ],
+  ["pre-Herdr container", (fixture) => { fixture.existing[0].Mounts.pop(); }, /Unexpected mounts/],
   [
     "standalone",
     (fixture) => { fixture.existing[0].Config.Labels = {}; },

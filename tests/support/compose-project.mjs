@@ -2,22 +2,33 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { acceptanceSuite } from "./acceptance.mjs";
+import { test } from "vitest";
+import { provideDisposable } from "./acceptance.mjs";
 import { runCommand } from "./engine.mjs";
+import { root } from "./files.mjs";
 
 /**
- * Define acceptance steps against public Make/Compose files in a private,
- * disposable project. Commands capture output (even with inherit requested)
- * so failures can be redacted. Command options accept the same
- * input/env/cwd/timeout options as runCommand.
+ * A `test` with a file-scoped `project` fixture: a private, disposable Compose
+ * project built from the public Make/Compose files, never the checkout's .env.
+ * Commands capture output (even with inherit requested) so failures can be
+ * redacted; they accept the same input/env/cwd/timeout options as runCommand.
  *
- * @param {string} title Suite name shown by the test reporter.
  * @param {{name: string, overlays?: string[], settings?: object}} options
- * @param {(p: object, step: (name: string, run: () => unknown) => void) => void} defineSteps
  */
-export function composeSuite(title, { name, overlays = [], settings = {} }, defineSteps) {
-  const root = fileURLToPath(new URL("../../", import.meta.url));
+export function composeTest({ name, overlays = [], settings = {} }) {
+  return test.extend({
+    project: [
+      // biome-ignore lint/correctness/noEmptyPattern: Vitest reads fixture dependencies from this destructuring pattern.
+      async ({}, use) => {
+        await provideDisposable(composeProject(name, overlays, settings), use);
+      },
+      { scope: "file" },
+    ],
+  });
+}
+
+/** Disposable resources for provideDisposable; setup() returns the fixture value. */
+function composeProject(name, overlays, settings) {
   const project = `pi-box-${name}-${randomUUID()}`;
   const directory = join(tmpdir(), project);
   const localSettings = {
@@ -59,17 +70,9 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
   };
   const docker = (args, extraOptions) => command("docker", args, extraOptions);
   const compose = (args, extraOptions) => docker(["compose", ...args], extraOptions);
-  const p = {
-    root, directory, project, settings: localSettings, docker, compose,
-    make: (target) => command("make", ["-o", "build", target]),
-    config: (files = []) => JSON.parse(compose([
-      ...files.flatMap((file) => ["-f", file]), "config", "--format", "json",
-    ])),
-    inspect: (id) => JSON.parse(docker(["inspect", id]))[0],
-  };
   let ready = false;
 
-  acceptanceSuite(title, {
+  return {
     names: `project ${project} in ${directory}; volumes ${localSettings.WORKSPACE_VOLUME}, ${localSettings.AGENT_VOLUME}, ${localSettings.GIT_VOLUME}, ${localSettings.HERDR_VOLUME}`,
     redact,
     setup() {
@@ -81,6 +84,14 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
       writeFileSync(join(directory, ".env"), Object.entries(localSettings)
         .map(([key, value]) => `${key}=${value}\n`).join(""), { mode: 0o600 });
       ready = true;
+      return {
+        root, directory, project, settings: localSettings, docker, compose,
+        make: (target) => command("make", ["-o", "build", target]),
+        config: (files = []) => JSON.parse(compose([
+          ...files.flatMap((file) => ["-f", file]), "config", "--format", "json",
+        ])),
+        inspect: (id) => JSON.parse(docker(["inspect", id]))[0],
+      };
     },
     cleanup(failed) {
       if (ready && failed) {
@@ -95,5 +106,5 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
         rmSync(directory, { recursive: true, force: true });
       }
     },
-  }, (step) => defineSteps(p, step));
+  };
 }

@@ -121,6 +121,7 @@ The default image includes:
     - **`@juicesharp/rpiv-todo`** — task tracking for multi-step work.
     - **[`pi-calm`](https://github.com/JesseZhang97/pi-calm)** — quieter tool output; toggle with `/calm`.
     - **`pi-stretchtext`** — expandable inline explanations that keep replies concise until you open the details.
+    - **[`pi-claude-bridge`](https://github.com/elidickinson/pi-claude-bridge)** — Claude Code-backed models in Pi, selected with `/model` under `claude-bridge`. Its Agent SDK includes the Claude Code executable; no separate CLI installation is needed to run the bridge. Configure Claude Code authentication separately; Pi's Anthropic login is not a substitute. The default Compose mounts do not persist `~/.claude` across container replacement.
     - **Herdr's official Pi integration** — Installed by `herdr integration install pi` at container startup; reports status and session identity, inactive outside Herdr.
 
 - **Sidecars**

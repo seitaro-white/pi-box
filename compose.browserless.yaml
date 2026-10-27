@@ -11,6 +11,9 @@ services:
   browser:
     image: ghcr.io/browserless/chromium:v2.57.1@sha256:93dc614e2532ee66bac78f68b6229c33392309293c626d2a0899ccdf0c8aac67
     init: true
+    # Runs as blessuser; Chromium's own sandbox is already disabled upstream.
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
     shm_size: 2gb
@@ -19,7 +22,8 @@ services:
     healthcheck:
       # /active requires authentication and returns 204 when ready.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/active?'+new URLSearchParams({token:process.env.TOKEN}),{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.status===204?0:1)).catch(()=>process.exit(1))"]
-      interval: 2s
+      interval: 30s
       timeout: 3s
-      retries: 30
-      start_period: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s

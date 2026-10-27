@@ -55,7 +55,7 @@ sbx env create ./sbxenv.yaml
 sbx env exec -it ./sbxenv.yaml -- bash -l
 ```
 
-Creation builds the local kit from `pi-box.yaml` and `sandbox/pi-box.dockerfile`.
+Creation builds the local kit from `pi-box.yaml` and the `Dockerfile`'s `sandbox` stage, selected by the `PI_BOX_TARGET` build argument.
 It defaults to 4 CPUs/4 GiB RAM, stays running after clients disconnect, and
 starts no Pi or tmux session automatically.
 

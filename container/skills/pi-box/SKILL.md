@@ -18,7 +18,7 @@ and sidecars are optional. Inspect configuration without printing secrets.
 | Persistent Compose path | Contents |
 |---|---|
 | `/workspace` | Projects |
-| `~/.pi/agent` | Pi settings, state and user packages |
+| `~/.pi/agent` | Pi settings, state and user packages; Claude Code state in `claude/` |
 | `~/.config/git` | Git settings and HTTPS credentials |
 | `~/.herdr` | Herdr state |
 

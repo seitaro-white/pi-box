@@ -14,7 +14,10 @@ test("native environment uses a local kit without host workspace or injected sec
 
 test("kit leaves networking to host policy and model login to Pi", () => {
   const kit = read("pi-box.yaml");
-  assert.match(kit, /^dockerfile: sandbox\/pi-box\.dockerfile$/m);
+  assert.match(kit, /^dockerfile: Dockerfile$/m);
+  assert.match(kit, /^ {4}buildArg: PI_BOX_TARGET$/m);
+  assert.match(kit, /^ {4}default: sandbox$/m);
+  assert.match(read("Dockerfile"), /^ARG PI_BOX_TARGET=recommended\n[^]*\nFROM \$\{PI_BOX_TARGET\}\n$/m);
   assert.doesNotMatch(kit, /(?:network-policy|credential|ssh-agent|filesystem)@/);
 });
 
@@ -23,8 +26,7 @@ test("standard image contexts exclude everything except reviewed build inputs", 
   assert.equal(docker, read(".containerignore"));
   assert.match(docker, /^\*\*$/m);
   assert.match(docker, /^!pi-box\.yaml$/m);
-  assert.match(docker, /^!sandbox\/pi-box\.dockerfile$/m);
   assert.doesNotMatch(docker, /^!.*(?:auth\.json|\.env|credentials|\.git\/|sbxenv)/m);
-  const recipe = read("sandbox/pi-box.dockerfile");
+  const recipe = read("Dockerfile");
   assert.doesNotMatch(recipe, /COPY\s+\.\s/);
 });

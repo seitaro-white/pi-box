@@ -2,9 +2,6 @@
 **
 !Dockerfile
 !pi-box.yaml
-!sandbox/
-sandbox/**
-!sandbox/pi-box.dockerfile
 !container/
 container/**
 !container/package.json

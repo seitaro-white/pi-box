@@ -37,5 +37,6 @@ Configuration and state survive container replacement. The official Pi reporter
 is refreshed at startup; the matching skill lives at `~/.agents/skills/herdr`.
 Use Pi's `/reload` after skill updates.
 
-Herdr's installer fetches the latest release at build time. Rebuild with
-`docker compose build --no-cache pi-box`, then replace the container to update it.
+Herdr is pinned by `HERDR_VERSION` and per-architecture checksums in the
+`Dockerfile`. To update it, change all three from the release's entries in
+`https://herdr.dev/latest.json`, then run `make up`.

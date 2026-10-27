@@ -94,7 +94,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: sandbox/pi-box.dockerfile
+          target: sandbox
           platforms: linux/${{ matrix.arch }}
           tags: pi-box:ci-sandbox
           load: true

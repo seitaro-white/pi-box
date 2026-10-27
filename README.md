@@ -32,7 +32,7 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
 
 ## Installation and usage
 
-Prerequisites for the existing Compose workflow: Docker with Compose v5.0 or newer.
+Prerequisites for the existing Compose workflow: Docker Engine 25 or newer with Compose v5.0 or newer.
 
 With Docker running, run:
 
@@ -109,7 +109,7 @@ The default image includes:
 
 - **Python, uv, Ruff and [ty](https://docs.astral.sh/ty/)** — Ruff provides Python linting/fixes; ty provides type checking (`ty check`) and LSP diagnostics.
 - **Node.js, npm and Biome**
-- **[Claude Code CLI](https://code.claude.com/docs/)** (recommended and sandbox images) — run `claude` directly or `claude auth login` to authenticate for Claude Code and the bridge. The default Compose mounts do not persist `~/.claude` or `~/.claude.json` across container replacement.
+- **[Claude Code CLI](https://code.claude.com/docs/)** (recommended and sandbox images) — run `claude` directly or `claude auth login` to authenticate for Claude Code and the bridge. In the recommended image, `CLAUDE_CONFIG_DIR` keeps Claude Code's login, settings and sessions in the agent volume (`~/.pi/agent/claude`), so they survive container replacement.
 - **PostgreSQL client (`psql`)**
 
 
@@ -122,7 +122,7 @@ The default image includes:
     - **`@juicesharp/rpiv-todo`** — task tracking for multi-step work.
     - **[`pi-calm`](https://github.com/JesseZhang97/pi-calm)** — quieter tool output; toggle with `/calm`.
     - **`pi-stretchtext`** — expandable inline explanations that keep replies concise until you open the details.
-    - **[`pi-claude-bridge`](https://github.com/elidickinson/pi-claude-bridge)** — Claude Code-backed models in Pi, selected with `/model` under `claude-bridge`. Its Agent SDK includes the Claude Code executable; no separate CLI installation is needed to run the bridge. Configure Claude Code authentication separately; Pi's Anthropic login is not a substitute. The default Compose mounts do not persist `~/.claude` across container replacement.
+    - **[`pi-claude-bridge`](https://github.com/elidickinson/pi-claude-bridge)** — Claude Code-backed models in Pi, selected with `/model` under `claude-bridge`. Its Agent SDK includes the Claude Code executable; no separate CLI installation is needed to run the bridge. Configure Claude Code authentication separately; Pi's Anthropic login is not a substitute.
     - **Herdr's official Pi integration** — Installed by `herdr integration install pi` at container startup; reports status and session identity, inactive outside Herdr.
 
 - **Sidecars**
@@ -250,7 +250,7 @@ The host must remain awake and online.
 
 ### Updating extensions
 
-Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff and ty are pinned separately in `Dockerfile` and `sandbox/pi-box.dockerfile`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
+Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff, ty, Herdr and Hunk are pinned by `ARG`s in `Dockerfile`. Herdr is also verified against per-architecture SHA-256 checksums; update them with its version from `https://herdr.dev/latest.json`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 

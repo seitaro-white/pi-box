@@ -21,10 +21,12 @@ services:
       - herdr:/home/node/.herdr
     healthcheck:
       test: ["CMD", "tmux", "has-session", "-t", "=shell"]
-      interval: 1s
+      # Poll every second while starting; --wait returns on the first success.
+      interval: 30s
       timeout: 3s
-      retries: 30
-      start_period: 3s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
 
 # Explicit names reuse the existing storage rather than project-prefixed volumes.
 volumes:

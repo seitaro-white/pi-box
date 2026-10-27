@@ -17,6 +17,15 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-pi-box}-postgres-container
     # PostgreSQL 15 matches Debian Bookworm's client; pin the multi-arch image.
     image: docker.io/library/postgres:15-bookworm@sha256:d4a8e1f88f475ee3e0137fa89d21ebc59f6c6ab16bf369ee92907607cc3455ae
+    # The entrypoint starts as root to fix data ownership, then drops to postgres.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     security_opt:
       - no-new-privileges:true
     environment:
@@ -29,10 +38,11 @@ services:
     healthcheck:
       # Authenticate over TCP; the temporary initialization server is socket-only.
       test: ["CMD-SHELL", "PGPASSWORD=\"$${POSTGRES_PASSWORD}\" psql -h 127.0.0.1 -U postgres -d appdb -tAc 'SELECT 1' >/dev/null"]
-      interval: 2s
+      interval: 30s
       timeout: 3s
-      retries: 30
-      start_period: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
 
 # Compose scopes this volume by project (default: pi-box_postgres).
 volumes:

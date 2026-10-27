@@ -17,10 +17,11 @@ services:
       - "127.0.0.1:${PHOENIX_UI_PORT:-6006}:6006"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:6006/healthz', timeout=2).close()"]
-      interval: 2s
+      interval: 30s
       timeout: 3s
-      retries: 30
-      start_period: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
 
 # Compose scopes SQLite storage by project (default: pi-box_phoenix).
 volumes:

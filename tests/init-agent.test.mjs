@@ -60,21 +60,19 @@ describe("agent initialization", () => {
     assert.equal(existsSync(join(dir, "auth.json")), false);
   });
 
-  it("seeds the correct private settings for fresh base and recommended installs", (t) => {
-    for (const profile of ["base", "recommended"]) {
+  for (const [profile, packages] of [["base", []], ["recommended", defaults]]) {
+    it(`seeds private settings for a fresh ${profile} install`, (t) => {
       const state = agentState(t);
       state.run(profile);
-      assert.deepEqual(state.json("settings.json"), {
-        packages: profile === "base" ? [] : defaults,
-      });
+      assert.deepEqual(state.json("settings.json"), { packages });
       for (const file of ["settings.json", "pi-box-packages.json"]) {
         assert.equal(statSync(state.path(file)).mode & 0o777, 0o600, file);
       }
       for (const file of policyFiles) {
         assert.equal(existsSync(state.path(file)), false, file);
       }
-    }
-  });
+    });
+  }
 
   it("preserves operator state and resource filters without rewriting on repeated startup", (t) => {
     const state = agentState(t);
@@ -169,15 +167,15 @@ describe("agent initialization", () => {
     });
   });
 
-  it("refuses broken settings or ownership without overwriting either file", (t) => {
-    for (const [file, content, error] of [
-      ["settings.json", "{broken", /SyntaxError/],
-      [
-        "pi-box-packages.json",
-        JSON.stringify({ version: 2, packages: [] }),
-        /Invalid Pi Box package ownership file/,
-      ],
-    ]) {
+  for (const [file, content, error] of [
+    ["settings.json", "{broken", /SyntaxError/],
+    [
+      "pi-box-packages.json",
+      JSON.stringify({ version: 2, packages: [] }),
+      /Invalid Pi Box package ownership file/,
+    ],
+  ]) {
+    it(`refuses a broken ${file} without overwriting either file`, (t) => {
       const state = agentState(t);
       state.run();
       state.write(file, content);
@@ -189,6 +187,6 @@ describe("agent initialization", () => {
       files.forEach((name, index) => {
         assert.equal(state.read(name), before[index], name);
       });
-    }
-  });
+    });
+  }
 });

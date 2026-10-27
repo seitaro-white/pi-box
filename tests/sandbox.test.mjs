@@ -17,7 +17,7 @@ test("kit leaves networking to host policy and model login to Pi", () => {
   assert.match(kit, /^dockerfile: Dockerfile$/m);
   assert.match(kit, /^ {4}buildArg: PI_BOX_TARGET$/m);
   assert.match(kit, /^ {4}default: sandbox$/m);
-  assert.match(read("Dockerfile"), /^ARG PI_BOX_TARGET=recommended\n[^]*\nFROM \$\{PI_BOX_TARGET\}\n$/m);
+  assert.match(read("Dockerfile"), /^ARG PI_BOX_TARGET=recommended\n[\s\S]*\nFROM \$\{PI_BOX_TARGET\}\n$/m);
   assert.doesNotMatch(kit, /(?:network-policy|credential|ssh-agent|filesystem)@/);
 });
 

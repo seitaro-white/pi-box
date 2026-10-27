@@ -1,19 +1,25 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { cpSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { acceptanceSuite } from "./acceptance.mjs";
 import { runCommand } from "./engine.mjs";
 
 /**
- * Run acceptance against public Make/Compose files in a private, disposable project.
- * Commands capture output (even with inherit requested) so failures can be redacted.
- * extraOptions accepts the same input/env/cwd/timeout options as runCommand.
+ * Define acceptance steps against public Make/Compose files in a private,
+ * disposable project. Commands capture output (even with inherit requested)
+ * so failures can be redacted. Command options accept the same
+ * input/env/cwd/timeout options as runCommand.
+ *
+ * @param {string} title Suite name shown by the test reporter.
+ * @param {{name: string, overlays?: string[], settings?: object}} options
+ * @param {(p: object, step: (name: string, run: () => unknown) => void) => void} defineSteps
  */
-export async function withComposeProject({ name, overlays = [], settings = {} }, run) {
+export function composeSuite(title, { name, overlays = [], settings = {} }, defineSteps) {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const project = `pi-box-${name}-${randomUUID()}`;
-  const directory = mkdtempSync(join(tmpdir(), `${project}-`));
+  const directory = join(tmpdir(), project);
   const localSettings = {
     POSTGRES_PASSWORD: randomBytes(32).toString("hex"),
     BROWSER_TOKEN: randomBytes(32).toString("hex"),
@@ -61,57 +67,33 @@ export async function withComposeProject({ name, overlays = [], settings = {} },
     ])),
     inspect: (id) => JSON.parse(docker(["inspect", id]))[0],
   };
-  let failure;
-  let result;
   let ready = false;
-  function cleanup(failed) {
-    if (failed && process.env.PI_BOX_KEEP_TEST_RESOURCES === "1") {
-      console.error(`Retained failed project ${project}: ${directory}; volumes ${localSettings.WORKSPACE_VOLUME}, ${localSettings.AGENT_VOLUME}, ${localSettings.GIT_VOLUME}, ${localSettings.HERDR_VOLUME}; sidecar resources use project ${project}.`);
-      return;
-    }
-    if (ready) compose(["down", "--volumes", "--remove-orphans", "--timeout", "10"], { timeout: 60_000 });
-    rmSync(directory, { recursive: true, force: true });
-  }
-  function interrupt(code) {
-    console.error(`Interrupted test project ${project}.`);
-    try {
-      cleanup(true);
-    } catch (error) {
-      console.error(`Cleanup failed in ${directory}: ${redact(error.message)}`);
-    }
-    process.exit(code);
-  }
-  const onInterrupt = () => interrupt(130);
-  const onTerminate = () => interrupt(143);
-  process.once("SIGINT", onInterrupt);
-  process.once("SIGTERM", onTerminate);
-  try {
-    // Never copy the checkout's .env, data, or container build inputs.
-    for (const path of ["Makefile", "scripts", ...readdirSync(root).filter(
-      (file) => /^compose(?:\.[\w-]+)?\.yaml$/.test(file),
-    )]) cpSync(join(root, path), join(directory, path), { recursive: true });
-    writeFileSync(join(directory, ".env"), Object.entries(localSettings)
-      .map(([key, value]) => `${key}=${value}\n`).join(""), { mode: 0o600 });
-    ready = true;
-    result = await run(p);
-  } catch (error) {
-    failure = new Error(redact(error instanceof Error ? error.stack || error.message : error));
-    if (ready) {
-      // Status only: config, environment and application logs may contain secrets.
+
+  acceptanceSuite(title, {
+    names: `project ${project} in ${directory}; volumes ${localSettings.WORKSPACE_VOLUME}, ${localSettings.AGENT_VOLUME}, ${localSettings.GIT_VOLUME}, ${localSettings.HERDR_VOLUME}`,
+    redact,
+    setup() {
+      mkdirSync(directory, { mode: 0o700 });
+      // Never copy the checkout's .env, data, or container build inputs.
+      for (const path of ["Makefile", "scripts", ...readdirSync(root).filter(
+        (file) => /^compose(?:\.[\w-]+)?\.yaml$/.test(file),
+      )]) cpSync(join(root, path), join(directory, path), { recursive: true });
+      writeFileSync(join(directory, ".env"), Object.entries(localSettings)
+        .map(([key, value]) => `${key}=${value}\n`).join(""), { mode: 0o600 });
+      ready = true;
+    },
+    cleanup(failed) {
+      if (ready && failed) {
+        // Status only: config, environment and application logs may contain secrets.
+        try {
+          console.error(redact(compose(["ps", "--all"], { timeout: 15_000 })));
+        } catch { /* Diagnostics must not mask the original failure. */ }
+      }
       try {
-        console.error(redact(compose(["ps", "--all"], { timeout: 15_000 })));
-      } catch { /* Diagnostics must not mask the original failure. */ }
-    }
-  } finally {
-    process.removeListener("SIGINT", onInterrupt);
-    process.removeListener("SIGTERM", onTerminate);
-    try {
-      cleanup(Boolean(failure));
-    } catch (error) {
-      console.error(`Cleanup failed for project ${project} in ${directory}: ${redact(error.message)}`);
-      failure ??= error;
-    }
-  }
-  if (failure) throw failure;
-  return result;
+        if (ready) compose(["down", "--volumes", "--remove-orphans", "--timeout", "10"], { timeout: 60_000 });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  }, (step) => defineSteps(p, step));
 }

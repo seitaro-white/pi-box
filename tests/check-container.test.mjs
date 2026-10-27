@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { temporaryDirectory } from "./helpers/files.mjs";
+import { root, temporaryDirectory } from "./helpers/files.mjs";
 
 const container = "pi-box-main-container";
 const volumes = [
@@ -46,7 +46,7 @@ function preflightFixture() {
   };
 }
 
-// Only command routing runs in the fake executable; policy scenarios stay here.
+// The fake docker only routes commands; policy scenarios stay in this file.
 function runPreflight(t, fixture) {
   const dir = temporaryDirectory(t, "pi-box-preflight-");
   const home = join(dir, "home");
@@ -61,28 +61,8 @@ function runPreflight(t, fixture) {
     writeFileSync(join(home, fixture.unsafePath), "SYNTHETIC");
   }
   writeFileSync(join(dir, "fixture.json"), JSON.stringify(fixture));
-  writeFileSync(join(dir, "docker"), String.raw`#!${process.execPath}
-const fs = require("node:fs");
-const { spawnSync } = require("node:child_process");
-const args = process.argv.slice(2);
-const fixture = JSON.parse(fs.readFileSync(process.env.FIXTURE, "utf8"));
-fs.appendFileSync(process.env.LOG, JSON.stringify(args) + "\n");
-let output;
-switch (args.slice(0, 2).join(" ")) {
-  case "compose config": output = fixture.config; break;
-  case "image inspect": output = fixture.image; break;
-  case "container ls": output = (args.includes("--filter") ? fixture.owned : fixture.names).join("\n"); break;
-  case "container inspect": output = fixture.existing; break;
-  case "ps --filter": output = (fixture.users[args[2]] || []).join("\n"); break;
-  case "exec -i": {
-    const script = fs.readFileSync(0, "utf8").replaceAll("/home/node", process.env.TEST_HOME);
-    const result = spawnSync("sh", ["-s"], { input: script, stdio: ["pipe", "inherit", "inherit"] });
-    process.exit(result.status ?? 1);
-  }
-  default: throw new Error("Unexpected Docker command: " + args.join(" "));
-}
-console.log(typeof output === "string" ? output : JSON.stringify(output));
-`, { mode: 0o755 });
+  const fakeDocker = join(root, "tests/fixtures/fake-docker.cjs");
+  writeFileSync(join(dir, "docker"), `#!/bin/sh\nexec "${process.execPath}" "${fakeDocker}" "$@"\n`, { mode: 0o755 });
   const result = spawnSync(process.execPath, ["scripts/check-container.mjs"], {
     encoding: "utf8",
     env: {
@@ -173,8 +153,8 @@ for (const [scenario, change, error] of [
   });
 }
 
-test("Make checks before Compose up/replace", () => {
-  for (const target of ["up", "replace"]) {
+for (const target of ["up", "replace"]) {
+  test(`make ${target} runs the preflight before Compose`, () => {
     const result = spawnSync("make", ["-n", target], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     const lines = result.stdout.split("\n");
@@ -184,5 +164,5 @@ test("Make checks before Compose up/replace", () => {
     assert.match(lines[up], /--no-build --pull (never|missing)/);
     if (target === "replace")
       assert.match(lines[up], /--no-deps --force-recreate/);
-  }
-});
+  });
+}

@@ -7,7 +7,7 @@ FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27
 
 # Development tools (Debian packages are not snapshot-pinned).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash bat ca-certificates curl fd-find git micro nano nnn postgresql-client ripgrep tmux \
+    && apt-get install -y --no-install-recommends bash bat ca-certificates curl fd-find git make micro nano nnn postgresql-client ripgrep tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # uv and a baseline Python interpreter.

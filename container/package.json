@@ -16,6 +16,7 @@
     "@juicesharp/rpiv-todo": "2.15.0",
     "pi-stretchtext": "0.1.0",
     "pi-claude-bridge": "0.9.3",
+    "@danielgap/pi-claude-usage": "0.2.3",
     "pi-calm": "git+https://github.com/JesseZhang97/pi-calm.git#d4ae210f05e1d6b8157172c6769be73b8ea533f9"
   },
   "piBox": {

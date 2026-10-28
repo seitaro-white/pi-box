@@ -104,7 +104,7 @@ The default image includes:
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
 - **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager, with its official `herdr` skill exposed to Pi. See [Pi-box setup and storage](docs/herdr.md).
 - **[Hunk](https://hunk.dev/)** (recommended image) — interactive terminal diff reviewer, with its `hunk-review` skill exposed to Pi. See [Hunk](https://github.com/modem-dev/hunk).
-- **Standard development tools:** Bash, Git, curl, ripgrep, fd (`fdfind` on Debian).
+- **Standard development tools:** Bash, Git, Make, curl, ripgrep, fd (`fdfind` on Debian).
 - **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
 - **Python, uv, Ruff and [ty](https://docs.astral.sh/ty/)** — Ruff provides Python linting/fixes; ty provides type checking (`ty check`) and LSP diagnostics.
@@ -123,6 +123,7 @@ The default image includes:
     - **[`pi-calm`](https://github.com/JesseZhang97/pi-calm)** — quieter tool output; toggle with `/calm`.
     - **`pi-stretchtext`** — expandable inline explanations that keep replies concise until you open the details.
     - **[`pi-claude-bridge`](https://github.com/elidickinson/pi-claude-bridge)** — Claude Code-backed models in Pi, selected with `/model` under `claude-bridge`. Its Agent SDK includes the Claude Code executable; no separate CLI installation is needed to run the bridge. Configure Claude Code authentication separately; Pi's Anthropic login is not a substitute.
+    - **[`@danielgap/pi-claude-usage`](https://github.com/danielgap/pi-claude-usage)** — Claude subscription usage in the status bar and `/claude:usage` panel while `claude-bridge` is selected; no Gentle Shell required. Uses your Claude Code subscription login (`claude auth login`) from `CLAUDE_CONFIG_DIR`; expired credentials must be refreshed by Claude Code.
     - **Herdr's official Pi integration** — Installed by `herdr integration install pi` at container startup; reports status and session identity, inactive outside Herdr.
 
 - **Sidecars**

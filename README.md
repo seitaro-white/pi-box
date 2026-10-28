@@ -258,6 +258,6 @@ Rebuilds retain persistent Pi settings, credentials and user-installed packages.
 
 ## Testing
 
-`npm test` runs the small Docker-free suite for state preservation, replacement guards and runtime-manifest consistency. `npm run test:integration` runs disposable Docker acceptance against prebuilt base, recommended and sandbox images, including Compose persistence, PostgreSQL and Browserless. Phoenix and live sandbox checks are explicitly opt-in.
+Tests use [Vitest](https://vitest.dev/); run `npm ci` once to install it. `npm test` runs the small Docker-free suite for state preservation, replacement guards and runtime-manifest consistency. `npm run test:integration` runs disposable Docker acceptance against prebuilt base, recommended and sandbox images, including Compose persistence, PostgreSQL and Browserless. Phoenix (`npm run test:phoenix`) and live sandbox (`npm run test:sandbox-live`) checks are explicitly opt-in.
 
 See [the test guide](tests/README.md) for image-build commands, suite selection and cleanup behaviour. CI uses the same acceptance runner on AMD64 and ARM64.

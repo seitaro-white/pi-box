@@ -86,6 +86,6 @@ does not disable the Pi exporter.
 Phoenix shows agent/LLM/tool spans and token usage, but native cost totals and
 cache-write token presentation are not populated by this setup.
 
-Run `npm run test:integration -- phoenix` against a prebuilt Pi image to check
+Run `npm run test:phoenix` against a prebuilt Pi image to check
 synthetic trace ingestion and storage persistence. See the
 [test guide](../tests/README.md).

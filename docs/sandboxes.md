@@ -136,11 +136,11 @@ Push or back up internal repositories and other needed files before replacement.
 Compose storage is independent.
 
 ```bash
-npm test                         # Docker-free checks
+npm ci && npm test               # Docker-free checks
 sbx kit validate .               # live kit build/validation
-node tests/sandbox-smoke.mjs     # inspect existing pi-sandbox
+npm run test:sandbox-live        # inspect existing pi-sandbox
 # Optional restart check; ends running sessions:
-SANDBOX_NAME=pi-sandbox-trial PI_BOX_SANDBOX_RESTART=1 node tests/sandbox-smoke.mjs
+SANDBOX_NAME=pi-sandbox-trial PI_BOX_SANDBOX_RESTART=1 npm run test:sandbox-live
 ```
 
 `sbx env rm ./sbxenv.yaml` deletes the sandbox's internal repositories,

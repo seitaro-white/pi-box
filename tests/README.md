@@ -1,50 +1,65 @@
 # Tests
 
+Tests use [Vitest](https://vitest.dev/). Run `npm ci` once to install it.
+
 ## Run
 
 ```sh
-npm test                         # Node built-ins only; no Docker or npm install
+npm test                           # unit tests: no Docker
 
 # Build images before acceptance:
 docker build --target base -t pi-box:0.2.0-base .
 docker build --target recommended -t pi-box:0.2.0 .
 docker build --target sandbox -t pi-box:0.2.0-sandbox .
-npm run test:integration
+npm run test:integration           # all default acceptance files
 
-# Select suites:
-npm run test:integration -- config
-npm run test:integration -- compose postgres
-npm run test:integration -- phoenix  # opt-in
-npm run test:integration -- --all
+# Select files by name, or tests by name with -t:
+npm run test:integration -- postgres browserless
+npm run test:integration -- compose -t "make replace"
+
+npm run test:phoenix               # opt-in: installs pi-otel, keeps traces
+npm run test:sandbox-live          # opt-in, macOS host: an existing Docker Sandbox
 ```
 
-Default suites: `config base recommended herdr sandbox compose postgres browserless`.
-CI uses the same selection on native AMD64/ARM64. Override image names with
-`PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAGE` and `PI_BOX_SANDBOX_IMAGE`.
+CI runs `npm test` and `npm run test:integration` on native AMD64/ARM64.
+Override image names with `PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAGE` and
+`PI_BOX_SANDBOX_IMAGE`. `vitest.config.mjs` defines the four projects.
 
-## Coverage
+## Layout
 
-| Tests | Boundary |
+| Path | Contents |
 |---|---|
-| `*.test.mjs` | State preservation, replacement guards, manifest/lockfile consistency, sandbox definitions |
-| `compose-configuration.mjs` | Overlay combinations, storage and port wiring |
-| `smoke.mjs` | Base/recommended tools, permissions, Pi guidance/skills, extensions and LSP |
-| `herdr-integration.mjs` | Reporter installation, offline extension loading and persistent Herdr state |
-| `compose.mjs` | Make/Compose lifecycle, dev port, replacement and persistent Pi/workspace/Git state |
-| `postgres-integration.mjs` | SQL connectivity and persistence |
-| `browserless-integration.mjs` | Authenticated CDP, Pi-served page interaction and artifacts |
-| `phoenix-integration.mjs` | Synthetic Pi traces and Phoenix persistence |
-| `sandbox-image.mjs` | Sandbox image without sbx or credentials |
+| `unit/` | State preservation, replacement guards, manifest/lockfile consistency, sandbox definitions |
+| `acceptance/compose-config`, `compose-dev-port` | Overlay combinations, storage and port wiring |
+| `acceptance/base-image`, `recommended-image` | Image tools, permissions, Pi guidance/skills, extensions and LSP |
+| `acceptance/herdr` | Reporter installation, offline extension loading and persistent Herdr state |
+| `acceptance/compose` | Make/Compose lifecycle, dev port, replacement and persistent Pi/workspace/Git state |
+| `acceptance/postgres` | SQL connectivity and persistence |
+| `acceptance/browserless` | Authenticated CDP, Pi-served page interaction and artifacts |
+| `acceptance/phoenix` | Synthetic Pi traces and Phoenix persistence (opt-in) |
+| `acceptance/sandbox-image` | Sandbox image without sbx or credentials |
+| `acceptance/sandbox-live` | An existing sandbox (opt-in); `PI_BOX_SANDBOX_RESTART=1` also stops it, ending sessions |
+| `support/` | Fixtures and helpers shared by tests |
+| `in-container/` | Scripts and clients piped or copied into containers under test |
 
-`tests/sandbox-smoke.mjs` is a **manual check of an existing sandbox**; its optional
-restart ends running sessions. See the [sandbox guide](../docs/sandboxes.md).
+## Writing tests
 
-## Writing acceptance suites
+Tests request fixtures by name, as in pytest:
 
-Acceptance files use `node:test` through `composeSuite` (Compose projects) or
-`acceptanceSuite` (other disposable resources) in `helpers/`. Steps run in order
-against shared resources; after a failure the remaining steps are skipped, so the
-report names the first broken behaviour. Use `waitFor` for readiness polling.
+- `support/fixtures.mjs` is the unit tests' `conftest.py`: `tmpDir` (like
+  `tmp_path`) and `agentState` (synthetic Pi state plus the real initializer).
+- `composeTest({ name, overlays, settings })` returns a `test` with a
+  file-scoped `project` fixture: a private, disposable Compose project.
+- `defineImageSmoke(profile)` defines the image smoke steps around a
+  file-scoped `container` fixture.
+
+Use `test.for` to parametrize. Acceptance files that build on earlier steps call
+`incrementalSteps()`: tests run in order and, after one fails, the rest are
+skipped, so the report names the first broken behaviour. Use `waitFor` for
+readiness polling.
+
+`vitest list` parses files statically by default, so parametrized names show
+their `$placeholders`; add `--staticParse=false` to see real names.
 
 ## Isolation and failures
 
@@ -52,5 +67,6 @@ Docker acceptance uses temporary projects, synthetic credentials, isolated volum
 and ephemeral host ports, independently of the checkout's `.env` and normal Pi-box
 resources. Sidecar tests may pull images and install disposable clients/exporters.
 
-Runs clean up owned resources, including on failure. Set
-`PI_BOX_KEEP_TEST_RESOURCES=1` to retain failing resources for inspection.
+Runs clean up owned resources, including on failure and Ctrl-C. Set
+`PI_BOX_KEEP_TEST_RESOURCES=1` to retain a failing file's resources for
+inspection. Generated secrets are redacted from command errors and failure output.

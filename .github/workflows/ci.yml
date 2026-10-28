@@ -27,9 +27,12 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22'
+          cache: npm
 
-      # Host tests use only Node.js built-ins; no npm install is needed.
-      - name: Run host tests
+      - name: Install test dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run unit tests
         run: npm test
 
   container-tests:
@@ -54,6 +57,10 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22'
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci --no-audit --no-fund
 
       # Runner-provided Compose can lag: start --wait requires Compose v5.0+.
       - name: Set up Docker Compose

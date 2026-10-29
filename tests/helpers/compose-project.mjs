@@ -24,9 +24,8 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
     POSTGRES_PASSWORD: randomBytes(32).toString("hex"),
     BROWSER_TOKEN: randomBytes(32).toString("hex"),
     PHOENIX_UI_PORT: "0",
-    DEV_PORT: "0", // Ephemeral host port: never collide with an operator's dev server.
     ...settings,
-    COMPOSE_FILE: ["compose.yaml", ...overlays].join(":"),
+    COMPOSE_FILE: ["compose.yaml", ...overlays, "compose.test-ports.yaml"].join(":"),
     COMPOSE_PROJECT_NAME: project,
     CONTAINER: project,
     IMAGE: process.env.PI_BOX_RECOMMENDED_IMAGE || "pi-box:0.2.0",
@@ -62,7 +61,7 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
   const p = {
     root, directory, project, settings: localSettings, docker, compose,
     make: (target) => command("make", ["-o", "build", target]),
-    config: (files = []) => JSON.parse(compose([
+    config: (files = ["compose.yaml", ...overlays]) => JSON.parse(compose([
       ...files.flatMap((file) => ["-f", file]), "config", "--format", "json",
     ])),
     inspect: (id) => JSON.parse(docker(["inspect", id]))[0],
@@ -78,6 +77,10 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
       for (const path of ["Makefile", "scripts", ...readdirSync(root).filter(
         (file) => /^compose(?:\.[\w-]+)?\.yaml$/.test(file),
       )]) cpSync(join(root, path), join(directory, path), { recursive: true });
+      // Runtime suites use ephemeral host ports; config checks read the real mappings.
+      writeFileSync(join(directory, "compose.test-ports.yaml"),
+        `services:\n  pi-box:\n    ports: !override\n${Array.from({ length: 10 }, (_, index) =>
+          `      - "127.0.0.1:0:${5173 + index}"\n`).join("")}`);
       writeFileSync(join(directory, ".env"), Object.entries(localSettings)
         .map(([key, value]) => `${key}=${value}\n`).join(""), { mode: 0o600 });
       ready = true;

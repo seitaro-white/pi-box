@@ -7,7 +7,7 @@ test "$EDITOR" = micro
 test "$VISUAL" = micro
 test "$PAGER" = batcat
 test "$(pi --version)" = "$EXPECTED_PI_VERSION"
-for tool in git make nano micro nnn batcat rg fdfind uv python tmux psql curl; do command -v "$tool" >/dev/null; done
+for tool in git ss make nano micro nnn batcat rg fdfind uv python tmux psql curl; do command -v "$tool" >/dev/null; done
 nano --version >/dev/null
 micro --version >/dev/null
 nnn -V >/dev/null

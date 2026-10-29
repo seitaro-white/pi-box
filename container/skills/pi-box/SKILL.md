@@ -33,7 +33,12 @@ home and Docker socket are not mounted by default.
 
 ## Web development
 
-Bind the app to `0.0.0.0:5173`; for Vite, save this in the dev script:
+Compose publishes ports `5173–5182` on host loopback. Check listeners with
+`ss -ltnp`, choose a free port in that range, and bind to `0.0.0.0`. Disable
+automatic port fallback; if startup reports the port occupied, try another in the
+range. Do not stop another project's server. Report the selected port and URL.
+
+For Vite, use the selected port in the dev script (5173 shown here):
 
 ```json
 "dev": "vite --host 0.0.0.0 --port 5173 --strictPort"
@@ -51,8 +56,11 @@ Remote tunnel, run on the viewing machine:
 ssh -N -L 127.0.0.1:5173:127.0.0.1:5173 your-docker-host
 ```
 
-Host `.env` setting `DEV_PORT` changes only the published host port. Another
-container port needs a matching host-side mapping. These mappings are Compose-only.
+The URLs above use port 5173 as an example; substitute the selected port.
+For remote viewing, repeat `-L` for each port needed in the same SSH command.
+Host `.env` setting `DEV_PORTS` changes only the published host range (it must
+contain ten ports); container ports remain `5173–5182`. Check with the user for
+custom host mappings. These mappings are Compose-only.
 
 ## Optional services
 

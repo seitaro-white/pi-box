@@ -2,12 +2,14 @@
 import assert from "node:assert/strict";
 import { composeSuite } from "./helpers/compose-project.mjs";
 
-const assertDevPort = (service, published) => {
-  assert.equal(service.ports.length, 1);
-  assert.equal(service.ports[0].host_ip, "127.0.0.1");
-  assert.equal(service.ports[0].target, 5173);
-  assert.equal(String(service.ports[0].published), published);
-  assert.equal(service.ports[0].protocol, "tcp");
+const assertDevPorts = (service, firstPublished) => {
+  assert.equal(service.ports.length, 10);
+  for (const [index, port] of service.ports.entries()) {
+    assert.equal(port.host_ip, "127.0.0.1");
+    assert.equal(port.target, 5173 + index);
+    assert.equal(String(port.published), String(firstPublished + index));
+    assert.equal(port.protocol, "tcp");
+  }
 };
 const overlayFiles = (names) => names.map((name) => `compose.${name}.yaml`);
 const serviceNames = { postgres: "postgres", browserless: "browser", phoenix: "phoenix" };
@@ -22,13 +24,13 @@ composeSuite("Compose configuration", {
     POSTGRES_PASSWORD: "synthetic-config-only",
     BROWSER_TOKEN: "synthetic-config-only",
     PHOENIX_UI_PORT: "0",
-    DEV_PORT: "", // Exercise Compose's 5173 default, not the helper's ephemeral port.
+    DEV_PORTS: "", // Exercise Compose's default range.
   },
 }, (p, step) => {
   step("compose.yaml alone is Pi Box with isolated volumes and no sidecar settings", () => {
     const base = p.config(["compose.yaml"]);
     assert.deepEqual(Object.keys(base.services), ["pi-box"]);
-    assertDevPort(base.services["pi-box"], "5173");
+    assertDevPorts(base.services["pi-box"], 5173);
     assert.equal(base.services["pi-box"].build.target, "recommended");
     assert.deepEqual(
       Object.values(base.volumes).map((volume) => volume.name).sort(),
@@ -47,7 +49,7 @@ composeSuite("Compose configuration", {
         Object.keys(config.services).sort(),
         ["pi-box", ...selected.map((name) => serviceNames[name])].sort(),
       );
-      assertDevPort(pi, "5173");
+      assertDevPorts(pi, 5173);
       if (selected.includes("postgres")) {
         assert.equal(pi.environment.PGHOST, "postgres");
         assert.equal(pi.environment.PGPASSWORD, config.services.postgres.environment.POSTGRES_PASSWORD);
@@ -76,12 +78,8 @@ composeSuite("Compose configuration", {
   }
 });
 
-composeSuite("Custom dev port", { name: "custom-dev-port", settings: { DEV_PORT: "15173" } }, (p, step) => {
-  step("a custom host port keeps the loopback binding and container port 5173", () => {
-    const port = p.config().services["pi-box"].ports;
-    assert.equal(port.length, 1);
-    assert.equal(port[0].host_ip, "127.0.0.1");
-    assert.equal(port[0].target, 5173);
-    assert.equal(String(port[0].published), "15173");
+composeSuite("Custom dev ports", { name: "custom-dev-ports", settings: { DEV_PORTS: "15173-15182" } }, (p, step) => {
+  step("a custom host range keeps loopback bindings and container ports 5173–5182", () => {
+    assertDevPorts(p.config().services["pi-box"], 15173);
   });
 });

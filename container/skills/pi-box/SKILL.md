@@ -33,15 +33,22 @@ home and Docker socket are not mounted by default.
 
 ## GitHub CLI
 
-Use `gh` for GitHub PRs, issues, checks and API operations. Check authentication
-with `gh auth status`; existing Git credentials do not automatically log in `gh`.
-If login is missing, ask the user to run
-`gh auth login --hostname github.com --git-protocol https --web` interactively,
-then `gh auth setup-git` if Git should use that login. Do not request tokens in chat or print stored credentials.
-Compose sets `GH_CONFIG_DIR=/home/node/.config/git/gh` so login survives replacement.
-Without a system keyring, tokens are stored there in plaintext and are accessible
-to the agent. A user-supplied `GH_TOKEN` overrides stored authentication; use
-narrow repository permissions when possible.
+Use `gh` for GitHub PRs, issues, checks and API operations. Prefer a user-supplied
+`GH_TOKEN` with narrow repository permissions; it can be the same token used by
+Git, but `gh` does not automatically read Git's credential store. Git push/pull
+keeps its existing helper; do not run `gh auth setup-git` or initiate browser login
+unless the user explicitly chooses that setup.
+
+Check authentication with `gh auth status`. If missing, ask the user to supply
+`GH_TOKEN` privately and start Pi from the shell exporting it; running sessions
+do not inherit later environment changes. Never request tokens in chat, print
+stored credentials or token environment values, or widen permissions automatically.
+On permission errors, report the required repository access or permission.
+
+Compose sets `GH_CONFIG_DIR=/home/node/.config/git/gh` so config and optional saved
+logins survive replacement; environment tokens must be supplied again. Without a
+system keyring, saved tokens are plaintext and accessible to the agent. `GH_TOKEN`
+takes precedence over stored authentication.
 
 ## Web development
 

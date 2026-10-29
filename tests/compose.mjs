@@ -19,9 +19,13 @@ composeSuite("Compose workflow", { name: "compose" }, (p, step) => {
     assert.equal(state.Config.User, "node");
     assert.ok(state.HostConfig.CapDrop.includes("ALL"));
     assert.ok(state.HostConfig.SecurityOpt.includes("no-new-privileges:true"));
-    assert.deepEqual(Object.keys(state.HostConfig.PortBindings), ["5173/tcp"]);
-    assert.equal(state.HostConfig.PortBindings["5173/tcp"].length, 1);
-    assert.equal(state.HostConfig.PortBindings["5173/tcp"][0].HostIp, "127.0.0.1");
+    const ports = Array.from({ length: 10 }, (_, index) => `${5173 + index}/tcp`);
+    assert.deepEqual(Object.keys(state.HostConfig.PortBindings).sort(), ports);
+    for (const port of ports) {
+      assert.equal(state.HostConfig.PortBindings[port].length, 1);
+      assert.equal(state.HostConfig.PortBindings[port][0].HostIp, "127.0.0.1");
+    }
+    exec(["ss", "-ltnp"]);
     assert.equal(state.Mounts.length, 4);
     fixture("check-persistence.mjs");
   };
@@ -38,24 +42,29 @@ composeSuite("Compose workflow", { name: "compose" }, (p, step) => {
     assertState();
   });
 
-  step("the dev port serves host HTTP on loopback only", async () => {
-    // A one-request server verifies real host-to-container HTTP, without app dependencies.
+  step("all ten dev ports serve host HTTP on loopback concurrently", async () => {
+    // One-request servers verify real host-to-container HTTP without app dependencies.
     p.compose(["exec", "-T", "-d", "pi-box", "node", "-e", `
-      const server = require('node:http').createServer((req, res) => {
-        res.end('pi-box-dev-port', () => server.close());
-      });
-      server.listen(5173, '0.0.0.0');
+      for (let port = 5173; port <= 5182; port++) {
+        const server = require('node:http').createServer((req, res) => {
+          res.end('pi-box-dev-port-' + port, () => server.close());
+        });
+        server.listen(port, '0.0.0.0');
+      }
       setTimeout(() => process.exit(1), 30000).unref();
     `]);
-    const bindings = inspect().NetworkSettings.Ports["5173/tcp"];
-    assert.equal(bindings.length, 1);
-    assert.equal(bindings[0].HostIp, "127.0.0.1");
-    const response = await waitFor(
-      () => fetch(`http://127.0.0.1:${bindings[0].HostPort}`, { signal: AbortSignal.timeout(1000) }),
-      { intervalMs: 100, message: "Dev server did not respond" },
-    );
-    assert.equal(response.status, 200);
-    assert.equal(await response.text(), "pi-box-dev-port");
+    const published = inspect().NetworkSettings.Ports;
+    for (let port = 5173; port <= 5182; port++) {
+      const bindings = published[`${port}/tcp`];
+      assert.equal(bindings.length, 1);
+      assert.equal(bindings[0].HostIp, "127.0.0.1");
+      const response = await waitFor(
+        () => fetch(`http://127.0.0.1:${bindings[0].HostPort}`, { signal: AbortSignal.timeout(1000) }),
+        { intervalMs: 100, message: `Dev server on port ${port} did not respond` },
+      );
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), `pi-box-dev-port-${port}`);
+    }
   });
 
   step("an unchanged make up keeps the running container", () => {

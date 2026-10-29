@@ -7,9 +7,9 @@ services:
       context: .
       target: ${TARGET:-recommended}
     container_name: ${CONTAINER:-pi-box-main-container}
-    # App must listen on 0.0.0.0:5173 inside Pi; never expose it to the LAN.
+    # Apps use 0.0.0.0:5173–5182 inside Pi; never expose them to the LAN.
     ports:
-      - "127.0.0.1:${DEV_PORT:-5173}:5173"
+      - "127.0.0.1:${DEV_PORTS:-5173-5182}:5173-5182"
     cap_drop:
       - ALL
     security_opt:

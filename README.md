@@ -175,10 +175,12 @@ Internal storage survives stop/start, but not sandbox deletion.
 
 ### Web development and browser access
 
-Compose publishes port **5173** at **http://localhost:5173** on the Docker host's
-loopback interface. Bind your app to **`0.0.0.0:5173`** inside Pi.
+Compose publishes ports **5173–5182** on the Docker host's loopback interface.
+Check listeners with `ss -ltnp` inside Pi, choose a free port in that range, and
+bind your app to **`0.0.0.0`**. Disable automatic port fallback; if startup reports
+the port occupied, try another in the range without stopping another project's server.
 
-For Vite, set the project's dev script:
+For Vite, set the project's dev script (using 5173 as an example):
 
 ```json
 {
@@ -191,9 +193,11 @@ For Vite, set the project's dev script:
 Run `npm run dev`. Pi's optional Browserless browser visits
 **`http://pi-box:5173`**; your host browser needs no sidecar.
 
-Set `DEV_PORT=15173` in `.env` and run `make up` to change the host port.
-The app and Browserless still use port 5173 internally. Applying changes can
-recreate Pi and end active sessions.
+Use the selected port in both URLs. To change the host range, set
+`DEV_PORTS=15173-15182` in `.env` and run `make up`. The range must contain ten
+ports, mapped in order to container ports 5173–5182; the app and Browserless use
+the container port. This replaces the old single-port `DEV_PORT` setting.
+Applying changes can recreate Pi and end active sessions.
 
 For remote viewing, run on your client machine:
 
@@ -201,8 +205,9 @@ For remote viewing, run on your client machine:
 ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:5173:127.0.0.1:5173 your-mac-ssh-alias
 ```
 
-Keep the tunnel open and visit `http://localhost:5173`. For a custom `DEV_PORT`,
-change the destination port; change the first port if the client port is occupied.
+Keep the tunnel open and visit `http://localhost:5173`. Repeat `-L` in the same
+command for each additional port needed. For a custom `DEV_PORTS` range, change
+the destination port; change the first port if the client port is occupied.
 
 ### Optional services: PostgreSQL
 

@@ -104,7 +104,7 @@ The default image includes:
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
 - **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager, with its official `herdr` skill exposed to Pi. See [Pi-box setup and storage](docs/herdr.md).
 - **[Hunk](https://hunk.dev/)** (recommended image) — interactive terminal diff reviewer, with its `hunk-review` skill exposed to Pi. See [Hunk](https://github.com/modem-dev/hunk).
-- **Standard development tools:** Bash, Git, Make, curl, ripgrep, fd (`fdfind` on Debian).
+- **Standard development tools:** Bash, Git, GitHub CLI (`gh`), Make, curl, ripgrep, fd (`fdfind` on Debian).
 - **TUI navigation tools:** micro (file editor), bat (`batcat` on Debian, file pager), nnn (file explorer). Used in combination these allow for a very basic terminal-based development experience, very handy if ssh'ing in from a client system that lacks an IDE.
 
 - **Python, uv, Ruff and [ty](https://docs.astral.sh/ty/)** — Ruff provides Python linting/fixes; ty provides type checking (`ty check`) and LSP diagnostics.
@@ -163,8 +163,28 @@ installs persist in the agent volume.
 
 Configure your Git identity inside the container and clone projects into `/workspace`. Git settings and HTTPS credentials persist in the Git volume; host Git configuration and SSH keys are not mounted automatically.
 
-For private repositories, use a narrowly scoped token. The credential helper
-stores it as plaintext in `/home/node/.config/git/credentials`, readable by Pi.
+GitHub CLI (`gh`) is included in both Compose images. After rebuilding, run inside
+the container:
+
+```sh
+gh auth login --hostname github.com --git-protocol https --web
+gh auth setup-git
+gh auth status
+```
+
+Open the displayed login URL in your own browser and enter the one-time code.
+`gh auth setup-git` lets Git use the same login for GitHub HTTPS operations.
+Existing Git credentials do not automatically authenticate `gh`, and host logins
+are not mounted. `GH_CONFIG_DIR=/home/node/.config/git/gh` keeps the CLI's config
+and login in the existing persistent Git volume across container replacement.
+Without a system keyring, `gh` stores its token in plaintext there, readable by Pi.
+Do not paste tokens into agent chats or commit them.
+
+For tighter repository access, use a fine-grained token with only the required
+repositories and permissions via `GH_TOKEN` in the shell running `gh` instead of
+browser login. Environment tokens must be supplied again after replacement.
+For Git without `gh`, the existing credential helper stores HTTPS tokens as
+plaintext in `/home/node/.config/git/credentials`, also readable by Pi.
 
 ### Docker Sandboxes
 

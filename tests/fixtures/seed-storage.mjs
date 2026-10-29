@@ -23,6 +23,11 @@ writeFileSync(
   JSON.stringify({ synthetic: "SYNTHETIC_AUTH_CANARY_NOT_A_REAL_TOKEN" }),
   { mode: 0o600 },
 );
+assert.equal(process.env.GH_CONFIG_DIR, "/home/node/.config/git/gh");
+execFileSync("gh", ["config", "set", "editor", "micro"]);
+writeFileSync(`${process.env.GH_CONFIG_DIR}/hosts.yml`,
+  "github.com:\n    user: synthetic\n    oauth_token: SYNTHETIC_GH_NOT_A_REAL_TOKEN\n    git_protocol: https\n",
+  { mode: 0o600 });
 execFileSync("git", ["config", "--global", "user.email", "synthetic@example.invalid"]);
 execFileSync("git", ["credential", "approve"], {
   input:

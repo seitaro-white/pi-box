@@ -32,6 +32,13 @@ test(
       }).trim(),
       "synthetic@example.invalid",
     );
+    assert.equal(process.env.GH_CONFIG_DIR, "/home/node/.config/git/gh");
+    assert.equal(execFileSync("gh", ["config", "get", "editor"], {
+      encoding: "utf8",
+    }).trim(), "micro");
+    const ghAuth = `${process.env.GH_CONFIG_DIR}/hosts.yml`;
+    assert.match(readFileSync(ghAuth, "utf8"), /oauth_token: SYNTHETIC_GH_NOT_A_REAL_TOKEN/);
+    assert.equal(statSync(ghAuth).mode & 0o777, 0o600);
     const credential = execFileSync("git", ["credential", "fill"], {
       input: "protocol=https\nhost=github.com\npath=synthetic/repo.git\n\n",
       encoding: "utf8",

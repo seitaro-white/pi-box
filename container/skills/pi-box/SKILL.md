@@ -19,7 +19,7 @@ and sidecars are optional. Inspect configuration without printing secrets.
 |---|---|
 | `/workspace` | Projects |
 | `~/.pi/agent` | Pi settings, state and user packages; Claude Code state in `claude/` |
-| `~/.config/git` | Git settings and HTTPS credentials |
+| `~/.config/git` | Git settings, HTTPS credentials and GitHub CLI login (`gh/`) |
 | `~/.herdr` | Herdr state |
 
 Other paths are container-local. uv Python/tool installs use the persistent agent
@@ -30,6 +30,18 @@ stop/start but is lost on deletion unless host-directory sharing is configured.
 Image builds, overlays, port publishing and container replacement are host-side
 operations from the Pi-box checkout. Replacement ends running sessions. The host
 home and Docker socket are not mounted by default.
+
+## GitHub CLI
+
+Use `gh` for GitHub PRs, issues, checks and API operations. Check authentication
+with `gh auth status`; existing Git credentials do not automatically log in `gh`.
+If login is missing, ask the user to run
+`gh auth login --hostname github.com --git-protocol https --web` interactively,
+then `gh auth setup-git` if Git should use that login. Do not request tokens in chat or print stored credentials.
+Compose sets `GH_CONFIG_DIR=/home/node/.config/git/gh` so login survives replacement.
+Without a system keyring, tokens are stored there in plaintext and are accessible
+to the agent. A user-supplied `GH_TOKEN` overrides stored authentication; use
+narrow repository permissions when possible.
 
 ## Web development
 

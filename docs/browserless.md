@@ -55,11 +55,10 @@ try {
 Keep authenticated URLs and raw connection errors private: they can contain the
 token. Close contexts and disconnect after use; sessions default to 30 seconds.
 
-Serve apps on `0.0.0.0` using a free port in `5173–5182` (check `ss -ltnp`).
-For port 5173, Browserless visits `http://pi-box:5173` and the host browser visits
-`http://localhost:5173`; substitute your selected port. Browser `localhost` refers to the
-sidecar. Use HTTP or `page.setContent()` for Pi-local files; screenshots saved by
-the client land in the Pi project directory.
+Serve apps on `0.0.0.0:<port>` using ports `5173–5182`. Browserless visits
+`http://pi-box:<port>`; the host browser visits `http://localhost:<port>`.
+Browser `localhost` refers to the sidecar. Use HTTP or `page.setContent()` for
+Pi-local files; client-saved screenshots land in the Pi project directory.
 
 ## Stop and test
 

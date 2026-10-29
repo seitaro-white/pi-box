@@ -7,7 +7,8 @@ test "$EDITOR" = micro
 test "$VISUAL" = micro
 test "$PAGER" = batcat
 test "$(pi --version)" = "$EXPECTED_PI_VERSION"
-for tool in git ss make nano micro nnn batcat rg fdfind uv python tmux psql curl; do command -v "$tool" >/dev/null; done
+for tool in gh git ss make nano micro nnn batcat rg fdfind uv python tmux psql curl; do command -v "$tool" >/dev/null; done
+gh --version >/dev/null
 nano --version >/dev/null
 micro --version >/dev/null
 nnn -V >/dev/null
@@ -62,6 +63,7 @@ test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600
 test "$(stat -c %a /home/node/.pi/agent/pi-box-packages.json)" = 600
 test -w /workspace
 test -w /home/node/.pi/agent
+test "$GH_CONFIG_DIR" = /home/node/.config/git/gh
 test "$GIT_CONFIG_GLOBAL" = /home/node/.config/git/config
 test -w /home/node/.config/git
 test "$(stat -c %a /home/node/.config/git)" = 700

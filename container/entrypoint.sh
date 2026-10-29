@@ -9,5 +9,7 @@ node /opt/pi/init-agent.mjs
 # Herdr's own managed reporter on replacement/restart, without starting Herdr.
 if command -v herdr >/dev/null 2>&1; then
     herdr integration install pi
+    install -m 0600 /opt/pi/extensions/herdr-question-state.ts \
+        "$HOME/.pi/agent/extensions/herdr-question-state.ts"
 fi
 exec "$@"

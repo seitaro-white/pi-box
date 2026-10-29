@@ -50,9 +50,10 @@ composeSuite("Herdr", { name: "herdr" }, (p, step) => {
     tmuxReady();
   });
 
-  step("startup installs the Pi reporter without starting the Herdr server", () => {
+  step("startup installs the Pi reporter and question bridge without starting the Herdr server", () => {
     assert.match(serverStatus(), /status: not running/);
     shell("test -s ~/.pi/agent/extensions/herdr-agent-state.ts");
+    shell("cmp /opt/pi/extensions/herdr-question-state.ts ~/.pi/agent/extensions/herdr-question-state.ts");
   });
 
   step("workspaces and worktrees are rooted in persistent storage", async () => {
@@ -91,8 +92,10 @@ composeSuite("Herdr", { name: "herdr" }, (p, step) => {
 
   step("replacement refreshes the reporter and keeps config, state and layout", async () => {
     shell("printf stale > ~/.pi/agent/extensions/herdr-agent-state.ts");
+    shell("printf stale > ~/.pi/agent/extensions/herdr-question-state.ts");
     recreate();
     assert.match(shell("head -1 ~/.pi/agent/extensions/herdr-agent-state.ts"), /installed by herdr/);
+    shell("cmp /opt/pi/extensions/herdr-question-state.ts ~/.pi/agent/extensions/herdr-question-state.ts");
     tmuxReady();
     assert.match(serverStatus(), /status: not running/);
     assert.equal(shell("sha256sum ~/.config/herdr/config.toml"), savedConfig);

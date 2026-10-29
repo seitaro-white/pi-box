@@ -171,6 +171,7 @@ RUN install -d -m 0700 -o node -g node /home/node/.herdr/config \
     && ln -s /home/node/.herdr/config /home/node/.config/herdr \
     && ln -s /home/node/.herdr/state /home/node/.local/state/herdr
 COPY --chown=node:node --chmod=0600 container/defaults/herdr.toml /home/node/.herdr/config/config.toml
+COPY container/extensions/herdr-question-state.ts /opt/pi/extensions/herdr-question-state.ts
 USER node
 WORKDIR /workspace
 

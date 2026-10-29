@@ -163,28 +163,36 @@ installs persist in the agent volume.
 
 Configure your Git identity inside the container and clone projects into `/workspace`. Git settings and HTTPS credentials persist in the Git volume; host Git configuration and SSH keys are not mounted automatically.
 
-GitHub CLI (`gh`) is included in both Compose images. After rebuilding, run inside
-the container:
+GitHub CLI (`gh`) is included in both Compose images. Prefer a fine-grained
+personal access token restricted to the repositories and permissions the agent
+needs. An existing GitHub token can be reused if its permissions cover the desired
+CLI operations; no separate account or browser login is required.
+
+After rebuilding, supply the token privately in a Bash shell inside the container
+(with shell tracing disabled):
 
 ```sh
-gh auth login --hostname github.com --git-protocol https --web
-gh auth setup-git
+read -rsp 'GitHub token: ' GH_TOKEN; printf '\n'
+export GH_TOKEN
 gh auth status
 ```
 
-Open the displayed login URL in your own browser and enter the one-time code.
-`gh auth setup-git` lets Git use the same login for GitHub HTTPS operations.
-Existing Git credentials do not automatically authenticate `gh`, and host logins
-are not mounted. `GH_CONFIG_DIR=/home/node/.config/git/gh` keeps the CLI's config
-and login in the existing persistent Git volume across container replacement.
-Without a system keyring, `gh` stores its token in plaintext there, readable by Pi.
-Do not paste tokens into agent chats or commit them.
+Start Pi from that same shell so its commands inherit `GH_TOKEN`. Already-running
+Pi sessions and other shells do not inherit it; supply it again for new sessions
+or after container replacement. Do not paste tokens into agent chats, put literal
+tokens in shell commands, or commit them.
 
-For tighter repository access, use a fine-grained token with only the required
-repositories and permissions via `GH_TOKEN` in the shell running `gh` instead of
-browser login. Environment tokens must be supplied again after replacement.
-For Git without `gh`, the existing credential helper stores HTTPS tokens as
-plaintext in `/home/node/.config/git/credentials`, also readable by Pi.
+Git push/pull continues using the existing credential helper and its plaintext
+store at `/home/node/.config/git/credentials`, readable by Pi. `gh` does not
+automatically read that store: `GH_TOKEN` supplies its API authentication separately,
+even when both use the same token. Do not run `gh auth setup-git` for this setup.
+If access is denied, check the token's repository permissions before broadening them.
+
+Optional browser login (`gh auth login`) is supported but typically grants broader
+access. `GH_CONFIG_DIR=/home/node/.config/git/gh` keeps CLI config and any saved
+login in the persistent Git volume. Without a system keyring, saved tokens are
+plaintext, accessible to Pi. `GH_TOKEN` takes precedence over a saved login;
+host credentials are not mounted automatically.
 
 ### Docker Sandboxes
 

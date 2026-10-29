@@ -11,6 +11,9 @@ container/**
 !container/gitconfig
 !container/init-agent.mjs
 !container/init-git.mjs
+!container/extensions/
+container/extensions/**
+!container/extensions/herdr-question-state.ts
 !container/defaults/
 container/defaults/**
 !container/defaults/herdr.toml

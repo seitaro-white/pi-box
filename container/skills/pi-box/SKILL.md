@@ -33,29 +33,16 @@ home and Docker socket are not mounted by default.
 
 ## GitHub CLI
 
-Use `gh` for GitHub PRs, issues, checks and API operations. Prefer a user-supplied
-`GH_TOKEN` with narrow repository permissions; it can be the same token used by
-Git, but `gh` does not automatically read Git's credential store. Git push/pull
-keeps its existing helper; do not run `gh auth setup-git` or initiate browser login
-unless the user explicitly chooses that setup.
-
-Check authentication with `gh auth status`. If missing, ask the user to supply
-`GH_TOKEN` privately and start Pi from the shell exporting it; running sessions
-do not inherit later environment changes. Never request tokens in chat, print
-stored credentials or token environment values, or widen permissions automatically.
-On permission errors, report the required repository access or permission.
-
-Compose sets `GH_CONFIG_DIR=/home/node/.config/git/gh` so config and optional saved
-logins survive replacement; environment tokens must be supplied again. Without a
-system keyring, saved tokens are plaintext and accessible to the agent. `GH_TOKEN`
-takes precedence over stored authentication.
+Use `gh` for GitHub PRs, issues, checks and API operations. Check `gh auth status`;
+authentication uses `GH_TOKEN`, which can reuse the existing GitHub token. If
+missing, ask the user to supply it privately in the shell launching Pi. Do not
+print credentials or request them in chat. Leave Git's credential helper unchanged.
+CLI config persists at `$GH_CONFIG_DIR` (`~/.config/git/gh`).
 
 ## Web development
 
-Compose publishes ports `5173–5182` on host loopback. Check listeners with
-`ss -ltnp`, choose a free port in that range, and bind to `0.0.0.0`. Disable
-automatic port fallback; if startup reports the port occupied, try another in the
-range. Do not stop another project's server. Report the selected port and URL.
+Choose a free port in `5173–5182` using `ss -ltnp` and bind to `0.0.0.0`.
+Disable automatic port fallback; retry another port if occupied. Report the URL.
 
 For Vite, use the selected port in the dev script (5173 shown here):
 
@@ -75,11 +62,9 @@ Remote tunnel, run on the viewing machine:
 ssh -N -L 127.0.0.1:5173:127.0.0.1:5173 your-docker-host
 ```
 
-The URLs above use port 5173 as an example; substitute the selected port.
-For remote viewing, repeat `-L` for each port needed in the same SSH command.
-Host `.env` setting `DEV_PORTS` changes only the published host range (it must
-contain ten ports); container ports remain `5173–5182`. Check with the user for
-custom host mappings. These mappings are Compose-only.
+Substitute the selected port in these URLs and repeat `-L` for additional ports.
+Host `.env` setting `DEV_PORTS` remaps the ten host ports; container ports remain
+`5173–5182`.
 
 ## Optional services
 

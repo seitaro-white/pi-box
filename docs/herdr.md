@@ -11,9 +11,8 @@ docker compose exec -w /workspace/my-project pi-box herdr
 
 Ask Pi to use Herdr or invoke `/skill:herdr` from a Herdr-managed pane.
 The bundled skill teaches Pi the Herdr CLI; the startup-installed official
-integration reports session identity and lifecycle state. A bundled bridge maps
-RPIV questionnaire waits to Herdr's blocked state, clearing it when you answer,
-cancel, or the questionnaire fails.
+integration reports session identity and lifecycle state, including blocked
+status while Pi waits for questionnaire answers.
 
 Use Herdr for visible interactive sessions and project coordination;
 `pi-subagents` handles structured subtasks and collected results. Its
@@ -35,11 +34,8 @@ The Herdr volume mounts at `~/.herdr` (`HERDR_VOLUME` overrides its name):
 - `~/.local/state/herdr` → `~/.herdr/state`
 - Worktrees: `/workspace/.worktrees`
 
-Configuration and state survive container replacement. The official Pi reporter
-and the Pi-box question bridge (`~/.pi/agent/extensions/herdr-question-state.ts`)
-are refreshed at startup; the matching skill lives at `~/.agents/skills/herdr`.
-Keep custom hooks in separate files. Use Pi's `/reload` after integration or
-skill updates.
+Configuration and state survive container replacement. Pi integrations refresh
+at startup; the skill lives at `~/.agents/skills/herdr`. Use Pi's `/reload` after updates.
 
 Herdr is pinned by `HERDR_VERSION` and per-architecture checksums in the
 `Dockerfile`. To update it, change all three from the release's entries in

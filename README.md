@@ -163,36 +163,10 @@ installs persist in the agent volume.
 
 Configure your Git identity inside the container and clone projects into `/workspace`. Git settings and HTTPS credentials persist in the Git volume; host Git configuration and SSH keys are not mounted automatically.
 
-GitHub CLI (`gh`) is included in both Compose images. Prefer a fine-grained
-personal access token restricted to the repositories and permissions the agent
-needs. An existing GitHub token can be reused if its permissions cover the desired
-CLI operations; no separate account or browser login is required.
-
-After rebuilding, supply the token privately in a Bash shell inside the container
-(with shell tracing disabled):
-
-```sh
-read -rsp 'GitHub token: ' GH_TOKEN; printf '\n'
-export GH_TOKEN
-gh auth status
-```
-
-Start Pi from that same shell so its commands inherit `GH_TOKEN`. Already-running
-Pi sessions and other shells do not inherit it; supply it again for new sessions
-or after container replacement. Do not paste tokens into agent chats, put literal
-tokens in shell commands, or commit them.
-
-Git push/pull continues using the existing credential helper and its plaintext
-store at `/home/node/.config/git/credentials`, readable by Pi. `gh` does not
-automatically read that store: `GH_TOKEN` supplies its API authentication separately,
-even when both use the same token. Do not run `gh auth setup-git` for this setup.
-If access is denied, check the token's repository permissions before broadening them.
-
-Optional browser login (`gh auth login`) is supported but typically grants broader
-access. `GH_CONFIG_DIR=/home/node/.config/git/gh` keeps CLI config and any saved
-login in the persistent Git volume. Without a system keyring, saved tokens are
-plaintext, accessible to Pi. `GH_TOKEN` takes precedence over a saved login;
-host credentials are not mounted automatically.
+Use `gh` for GitHub PRs, issues and checks. Supply your existing GitHub token as
+`GH_TOKEN` in the shell launching Pi; check with `gh auth status`. Git push/pull
+keeps using its existing credential helper. CLI config persists in
+`/home/node/.config/git/gh`; `GH_TOKEN` must be supplied for each new session.
 
 ### Docker Sandboxes
 
@@ -203,10 +177,8 @@ Internal storage survives stop/start, but not sandbox deletion.
 
 ### Web development and browser access
 
-Compose publishes ports **5173–5182** on the Docker host's loopback interface.
-Check listeners with `ss -ltnp` inside Pi, choose a free port in that range, and
-bind your app to **`0.0.0.0`**. Disable automatic port fallback; if startup reports
-the port occupied, try another in the range without stopping another project's server.
+Compose publishes ports **5173–5182** on host loopback. Check `ss -ltnp`, choose
+a free port, and bind to **`0.0.0.0`** with automatic port fallback disabled.
 
 For Vite, set the project's dev script (using 5173 as an example):
 
@@ -221,11 +193,9 @@ For Vite, set the project's dev script (using 5173 as an example):
 Run `npm run dev`. Pi's optional Browserless browser visits
 **`http://pi-box:5173`**; your host browser needs no sidecar.
 
-Use the selected port in both URLs. To change the host range, set
-`DEV_PORTS=15173-15182` in `.env` and run `make up`. The range must contain ten
-ports, mapped in order to container ports 5173–5182; the app and Browserless use
-the container port. This replaces the old single-port `DEV_PORT` setting.
-Applying changes can recreate Pi and end active sessions.
+Use the selected port in both URLs. To remap the ten host ports, set
+`DEV_PORTS=15173-15182` in `.env` and run `make up` (ends sessions if Pi is recreated).
+Container ports stay 5173–5182.
 
 For remote viewing, run on your client machine:
 
@@ -233,9 +203,8 @@ For remote viewing, run on your client machine:
 ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:5173:127.0.0.1:5173 your-mac-ssh-alias
 ```
 
-Keep the tunnel open and visit `http://localhost:5173`. Repeat `-L` in the same
-command for each additional port needed. For a custom `DEV_PORTS` range, change
-the destination port; change the first port if the client port is occupied.
+Visit `http://localhost:5173` while the tunnel is open. Repeat `-L` for additional
+ports; use the mapped host port as the destination if you changed `DEV_PORTS`.
 
 ### Optional services: PostgreSQL
 

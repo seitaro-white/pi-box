@@ -9,14 +9,6 @@
   },
   "piBox": {
     "personalSkills": false,
-    "packageResources": {
-      "pi-context": {
-        "extensions": [
-          "src/context.ts"
-        ],
-        "skills": []
-      }
-    },
     "npmTools": []
   }
 }

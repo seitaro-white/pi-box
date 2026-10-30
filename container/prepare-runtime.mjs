@@ -12,7 +12,7 @@ export const PI_PACKAGE = "@earendil-works/pi-coding-agent";
  *
  * @param {object} manifest Authoritative runtime package manifest.
  * @param {"base" | "recommended"} profile Image variant to prepare.
- * @returns {{manifest: object, settings: {packages: string[]}}} Generated files.
+ * @returns {{manifest: object, settings: {packages: (string | object)[]}}} Generated files.
  * @throws {Error} If the profile is invalid, Pi is missing, or sources are not pinned.
  */
 export function prepareRuntime(manifest, profile) {
@@ -54,7 +54,11 @@ export function prepareRuntime(manifest, profile) {
       packages: [
         ...Object.keys(dependencies)
           .filter((name) => name !== PI_PACKAGE && !npmTools.includes(name))
-          .map((name) => `/opt/pi/node_modules/${name}`),
+          .map((name) => {
+            const source = `/opt/pi/node_modules/${name}`;
+            const resources = manifest.piBox?.packageResources?.[name];
+            return resources ? { source, ...resources } : source;
+          }),
         ...(profile === "recommended" && manifest.piBox?.personalSkills
           ? ["/opt/pi/node_modules/personal-skills"]
           : []),

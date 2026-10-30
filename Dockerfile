@@ -66,6 +66,7 @@ ENV HOME=/home/agent \
     NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt \
     NODE_USE_ENV_PROXY=1 \
     EDITOR=micro VISUAL=micro PAGER=batcat LANG=C.UTF-8 TERM=xterm-256color
+COPY --chown=agent:agent container/defaults/micro-settings.json /home/agent/.config/micro/settings.json
 USER agent
 # Register bundled extensions once, without touching runtime login credentials.
 RUN node /opt/pi/init-agent.mjs
@@ -83,6 +84,7 @@ ENV UV_PYTHON_INSTALL_DIR=/home/node/.pi/agent/python \
     PATH=/home/node/.pi/agent/bin:$PATH
 
 COPY container/entrypoint.sh /usr/local/bin/pi-box-entrypoint
+COPY --chown=node:node container/defaults/micro-settings.json /home/node/.config/micro/settings.json
 COPY container/tmux.conf /etc/tmux.conf
 COPY container/gitconfig /etc/gitconfig
 COPY container/init-agent.mjs container/init-git.mjs container/prepare-runtime.mjs /opt/pi/

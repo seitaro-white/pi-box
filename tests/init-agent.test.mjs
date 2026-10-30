@@ -150,6 +150,24 @@ describe("agent initialization", () => {
     assert(!defaults.includes(retired));
   });
 
+  it("replaces the managed context dashboard with the context explorer on upgrade", (t) => {
+    const state = agentState(t);
+    const retired = "/opt/pi/node_modules/pi-context";
+    state.writeJson("pi-box-packages.json", { version: 1, packages: [retired] });
+    state.writeJson("settings.json", {
+      packages: [
+        { source: retired, extensions: ["src/context.ts"], skills: [] },
+        operatorPackage,
+      ],
+    });
+
+    state.run();
+
+    const packages = state.json("settings.json").packages;
+    assert.deepEqual(packages, [operatorPackage, ...defaults]);
+    assert.ok(packages.includes("/opt/pi/node_modules/pi-context-view"));
+  });
+
   it("preserves unowned image paths when no ownership file exists", (t) => {
     const state = agentState(t);
     const packages = [

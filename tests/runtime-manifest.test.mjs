@@ -71,9 +71,7 @@ describe("runtime manifests", () => {
       manifest: source,
       settings: {
         packages: [
-          ...extensions.map((name) => name === "pi-context"
-            ? { source: "/opt/pi/node_modules/pi-context", extensions: ["src/context.ts"], skills: [] }
-            : `/opt/pi/node_modules/${name}`),
+          ...extensions.map((name) => `/opt/pi/node_modules/${name}`),
           "/opt/pi/node_modules/personal-skills",
         ],
       },
@@ -101,14 +99,13 @@ describe("runtime manifests", () => {
     }
   });
 
-  it("loads only the context dashboard and does not bundle Intercom", () => {
+  it("loads the context explorer instead of the context-management package", () => {
     const packages = prepareRuntime(source, "recommended").settings.packages;
-    assert.deepEqual(packages.find((item) => item.source?.endsWith("/pi-context")), {
-      source: "/opt/pi/node_modules/pi-context",
-      extensions: ["src/context.ts"],
-      skills: [],
-    });
+    assert.ok(packages.includes("/opt/pi/node_modules/pi-context-view"));
+    assert.equal(source.dependencies["pi-context"], undefined);
     assert.equal(source.dependencies["pi-intercom"], undefined);
+    const lock = readJson(join(root, "container/package-lock.json"));
+    assert.equal(lock.packages["node_modules/pi-context"], undefined);
   });
 
   it("treats Claude Code as a CLI tool rather than a Pi extension", () => {

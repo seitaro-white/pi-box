@@ -7,6 +7,13 @@
     "/opt/pi/node_modules/@juicesharp/rpiv-ask-user-question",
     "/opt/pi/node_modules/@juicesharp/rpiv-todo",
     "/opt/pi/node_modules/pi-stretchtext",
+    {
+      "source": "/opt/pi/node_modules/pi-context",
+      "extensions": [
+        "src/context.ts"
+      ],
+      "skills": []
+    },
     "/opt/pi/node_modules/pi-claude-bridge",
     "/opt/pi/node_modules/@danielgap/pi-claude-usage",
     "/opt/pi/node_modules/pi-calm",

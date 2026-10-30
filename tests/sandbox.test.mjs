@@ -26,6 +26,7 @@ test("standard image contexts exclude everything except reviewed build inputs", 
   assert.equal(docker, read(".containerignore"));
   assert.match(docker, /^\*\*$/m);
   assert.match(docker, /^!pi-box\.yaml$/m);
+  assert.match(docker, /^!container\/defaults\/micro-settings\.json$/m);
   assert.match(docker, /^!container\/extensions\/\ncontainer\/extensions\/\*\*\n!container\/extensions\/herdr-question-state\.ts$/m);
   assert.doesNotMatch(docker, /^!.*(?:auth\.json|\.env|credentials|\.git\/|sbxenv)/m);
   const recipe = read("Dockerfile");

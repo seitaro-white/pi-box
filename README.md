@@ -256,6 +256,8 @@ The host must remain awake and online.
 
 Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff, ty, Herdr and Hunk are pinned by `ARG`s in `Dockerfile`. Herdr is also verified against per-architecture SHA-256 checksums; update them with its version from `https://herdr.dev/latest.json`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
+Tool installers, npm runtimes and personal skills build in independent stages, so updating one does not rerun unrelated installers. Final images configure their filesystem before copying tool artifacts, with npm packages and personal skills near the end. Pi, extensions, Biome and Claude Code share one npm installation; changing any of their pins reruns that installation. The Pi-only base runtime still reads the shared manifest, so manifest changes also invalidate its npm installation.
+
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 
 Rebuilds retain persistent Pi settings, credentials and user-installed packages. Image-managed extension registrations are reconciled at startup; rebuilding does not reset your personal configuration.

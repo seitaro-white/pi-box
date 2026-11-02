@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { agentState } from "./helpers/agent-state.mjs";
@@ -60,19 +60,17 @@ describe("agent initialization", () => {
     assert.equal(existsSync(join(dir, "auth.json")), false);
   });
 
-  for (const [profile, packages] of [["base", []], ["recommended", defaults]]) {
-    it(`seeds private settings for a fresh ${profile} install`, (t) => {
-      const state = agentState(t);
-      state.run(profile);
-      assert.deepEqual(state.json("settings.json"), { packages });
-      for (const file of ["settings.json", "pi-box-packages.json"]) {
-        assert.equal(statSync(state.path(file)).mode & 0o777, 0o600, file);
-      }
-      for (const file of policyFiles) {
-        assert.equal(existsSync(state.path(file)), false, file);
-      }
-    });
-  }
+  it("seeds private settings for a fresh install", (t) => {
+    const state = agentState(t);
+    state.run();
+    assert.deepEqual(state.json("settings.json"), { packages: defaults });
+    for (const file of ["settings.json", "pi-box-packages.json"]) {
+      assert.equal(statSync(state.path(file)).mode & 0o777, 0o600, file);
+    }
+    for (const file of policyFiles) {
+      assert.equal(existsSync(state.path(file)), false, file);
+    }
+  });
 
   it("preserves operator state and resource filters without rewriting on repeated startup", (t) => {
     const state = agentState(t);
@@ -105,19 +103,6 @@ describe("agent initialization", () => {
         file,
       );
     });
-  });
-
-  it("reconciles recommended → base → recommended while preserving operator state", (t) => {
-    const state = agentState(t);
-    seedOperatorState(state);
-    for (const profile of ["recommended", "base", "recommended"]) {
-      state.run(profile);
-      assertOperatorState(state);
-      assert.deepEqual(state.json("settings.json").packages, [
-        operatorPackage,
-        ...(profile === "base" ? [] : defaults),
-      ]);
-    }
   });
 
   it("removes formerly managed packages without removing unrelated image paths", (t) => {
@@ -175,8 +160,10 @@ describe("agent initialization", () => {
       operatorPackage,
     ];
     state.writeJson("settings.json", { packages });
+    const emptyDefaults = temporaryDirectory(t, "pi-box-defaults-");
+    writeFileSync(join(emptyDefaults, "settings.json"), '{"packages":[]}');
 
-    state.run("base");
+    state.run(emptyDefaults);
 
     assert.deepEqual(state.json("settings.json").packages, packages);
     assert.deepEqual(state.json("pi-box-packages.json"), {

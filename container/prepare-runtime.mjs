@@ -1,6 +1,6 @@
 // package.json is authoritative. Direct dependencies except Pi and piBox.npmTools
 // are bundled Pi packages. Personal skills are added from Git at image build time.
-// Derive manifests and registrations; never resolve versions.
+// Derive registrations; never resolve versions.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -8,17 +8,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const PI_PACKAGE = "@earendil-works/pi-coding-agent";
 
 /**
- * Derive a profile's dependencies and Pi package registrations from pinned inputs.
+ * Derive Pi package registrations from pinned inputs.
  *
  * @param {object} manifest Authoritative runtime package manifest.
- * @param {"base" | "recommended"} profile Image variant to prepare.
- * @returns {{manifest: object, settings: {packages: (string | object)[]}}} Generated files.
- * @throws {Error} If the profile is invalid, Pi is missing, or sources are not pinned.
+ * @returns {{settings: {packages: (string | object)[]}}} Generated files.
+ * @throws {Error} If Pi is missing or sources are not pinned.
  */
-export function prepareRuntime(manifest, profile) {
-  if (!["base", "recommended"].includes(profile)) {
-    throw new Error("Profile must be base or recommended");
-  }
+export function prepareRuntime(manifest) {
   if (!manifest.dependencies?.[PI_PACKAGE]) {
     throw new Error("Runtime must include Pi");
   }
@@ -38,28 +34,17 @@ export function prepareRuntime(manifest, profile) {
     throw new Error("piBox.npmTools must list non-Pi runtime dependencies");
   }
 
-  const dependencies =
-    profile === "base"
-      ? { [PI_PACKAGE]: manifest.dependencies[PI_PACKAGE] }
-      : manifest.dependencies;
   return {
-    manifest: {
-      ...manifest,
-      ...(profile === "base" && manifest.piBox
-        ? { piBox: { ...manifest.piBox, personalSkills: false, npmTools: [] } }
-        : {}),
-      dependencies,
-    },
     settings: {
       packages: [
-        ...Object.keys(dependencies)
+        ...Object.keys(manifest.dependencies)
           .filter((name) => name !== PI_PACKAGE && !npmTools.includes(name))
           .map((name) => {
             const source = `/opt/pi/node_modules/${name}`;
             const resources = manifest.piBox?.packageResources?.[name];
             return resources ? { source, ...resources } : source;
           }),
-        ...(profile === "recommended" && manifest.piBox?.personalSkills
+        ...(manifest.piBox?.personalSkills
           ? ["/opt/pi/node_modules/personal-skills"]
           : []),
       ],
@@ -72,16 +57,12 @@ if (
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 ) {
   const sourceDir = dirname(fileURLToPath(import.meta.url));
-  const [profile, destination = sourceDir] = process.argv.slice(2);
+  const [destination = sourceDir] = process.argv.slice(2);
   const source = JSON.parse(
     readFileSync(join(sourceDir, "package.json"), "utf8"),
   );
-  const runtime = prepareRuntime(source, profile);
+  const runtime = prepareRuntime(source);
   mkdirSync(join(destination, "defaults"), { recursive: true });
-  writeFileSync(
-    join(destination, "package.json"),
-    JSON.stringify(runtime.manifest, null, 2) + "\n",
-  );
   writeFileSync(
     join(destination, "defaults/settings.json"),
     JSON.stringify(runtime.settings, null, 2) + "\n",

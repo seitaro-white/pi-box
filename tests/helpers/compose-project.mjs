@@ -29,7 +29,6 @@ export function composeSuite(title, { name, overlays = [], settings = {} }, defi
     COMPOSE_PROJECT_NAME: project,
     CONTAINER: project,
     IMAGE: process.env.PI_BOX_RECOMMENDED_IMAGE || "pi-box:0.2.0",
-    TARGET: "recommended",
     WORKSPACE_VOLUME: `${project}-workspace`,
     AGENT_VOLUME: `${project}-agent`,
     GIT_VOLUME: `${project}-git`,

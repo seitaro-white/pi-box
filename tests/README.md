@@ -6,7 +6,6 @@
 npm test                         # Node built-ins only; no Docker or npm install
 
 # Build images before acceptance:
-docker build --target base -t pi-box:0.2.0-base .
 docker build --target recommended -t pi-box:0.2.0 .
 docker build --target sandbox -t pi-box:0.2.0-sandbox .
 npm run test:integration
@@ -18,9 +17,9 @@ npm run test:integration -- phoenix  # opt-in
 npm run test:integration -- --all
 ```
 
-Default suites: `config base recommended herdr sandbox compose postgres browserless`.
+Default suites: `config recommended herdr sandbox compose postgres browserless`.
 CI uses the same selection on native AMD64/ARM64. Override image names with
-`PI_BOX_BASE_IMAGE`, `PI_BOX_RECOMMENDED_IMAGE` and `PI_BOX_SANDBOX_IMAGE`.
+`PI_BOX_RECOMMENDED_IMAGE` and `PI_BOX_SANDBOX_IMAGE`.
 
 ## Coverage
 
@@ -28,7 +27,7 @@ CI uses the same selection on native AMD64/ARM64. Override image names with
 |---|---|
 | `*.test.mjs` | State preservation, replacement guards, manifest/lockfile consistency, sandbox definitions |
 | `compose-configuration.mjs` | Overlay combinations, storage and port wiring |
-| `smoke.mjs` | Base/recommended tools, permissions, Pi guidance/skills, extensions and LSP |
+| `smoke.mjs` | Tools, permissions, Pi guidance/skills, extensions and LSP |
 | `herdr-integration.mjs` | Reporter installation, offline extension loading and persistent Herdr state |
 | `compose.mjs` | Make/Compose lifecycle, dev port, replacement and persistent Pi/workspace/Git state |
 | `postgres-integration.mjs` | SQL connectivity and persistence |

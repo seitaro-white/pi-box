@@ -5,7 +5,7 @@ services:
     image: ${IMAGE:-pi-box:0.2.0}
     build:
       context: .
-      target: ${TARGET:-recommended}
+      target: recommended
     container_name: ${CONTAINER:-pi-box-main-container}
     # Apps use 0.0.0.0:5173–5182 inside Pi; never expose them to the LAN.
     ports:

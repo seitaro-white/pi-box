@@ -41,7 +41,7 @@ FROM system AS npm-runtime
 WORKDIR /opt/pi
 COPY container/package.json container/package-lock.json container/prepare-runtime.mjs ./
 # npm can canonicalize GitHub Git sources to SSH; force anonymous HTTPS for builds.
-RUN node prepare-runtime.mjs recommended \
+RUN node prepare-runtime.mjs \
     && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=url.https://github.com/.insteadOf \
        GIT_CONFIG_VALUE_0=ssh://git@github.com/ \
        npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
@@ -53,17 +53,6 @@ FROM system AS personal-skills
 # BuildKit resolves main on every build and keys the cache by its commit.
 # Keep the old package path so existing settings and resource filters still work.
 ADD https://github.com/seitaro-white/personal-agent-skills.git#main /opt/pi/node_modules/personal-skills/
-
-# Root's build-time npm cache must not touch the runtime user's home directory.
-# The base lockfile describes only Pi. Derive its manifest from the same source
-# used by recommended; npm ci fails if the derived manifest and lock disagree.
-FROM system AS base-runtime
-WORKDIR /opt/pi
-COPY container/package.json container/prepare-runtime.mjs ./
-COPY container/base/package-lock.json ./package-lock.json
-RUN node prepare-runtime.mjs base \
-    && npm ci --cache /tmp/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund \
-    && rm -rf /tmp/npm-cache
 
 # Docker Sandboxes kit image (pi-box.yaml): mountless, no Herdr or Hunk.
 FROM cloud-tools AS sandbox
@@ -140,13 +129,6 @@ COPY container/skills/pi-box/SKILL.md /home/node/.agents/skills/pi-box/SKILL.md
 
 ENTRYPOINT ["/usr/local/bin/pi-box-entrypoint"]
 CMD ["tmux", "-D"]
-
-FROM common AS base
-USER root
-RUN ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi
-COPY --from=base-runtime /opt/pi /opt/pi
-USER node
-WORKDIR /workspace
 
 # Assemble configuration before tools, then copy the frequently updated packages.
 FROM common AS recommended

@@ -8,7 +8,7 @@ import { root, readJson, temporaryDirectory } from "./files.mjs";
  * Never reads or writes the host's Pi state; cleanup belongs to the owning test.
  *
  * @param {import("node:test").TestContext} t Owning test context.
- * @returns {object} File helpers and a profile-aware initializer runner.
+ * @returns {object} File helpers and an initializer runner.
  */
 export function agentState(t) {
   const dir = temporaryDirectory(t, "pi-box-init-");
@@ -23,15 +23,12 @@ export function agentState(t) {
     json: (name) => readJson(path(name)),
     write,
     writeJson: (name, value) => write(name, JSON.stringify(value)),
-    run: (profile = "recommended") =>
+    run: (defaultsDir = join(root, "container/defaults")) =>
       execFileSync(process.execPath, [join(root, "container/init-agent.mjs")], {
         env: {
           ...process.env,
           PI_CODING_AGENT_DIR: dir,
-          PI_BOX_DEFAULTS_DIR: join(
-            root,
-            profile === "base" ? "container/base/defaults" : "container/defaults",
-          ),
+          PI_BOX_DEFAULTS_DIR: defaultsDir,
         },
         stdio: "pipe",
       }),

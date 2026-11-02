@@ -114,6 +114,8 @@ acceptanceSuite(`${profile} image: ${image}`, {
       `EXPECTED_PROFILE=${profile}`,
       `EXPECTED_HUNK_VERSION=${dockerArg("HUNK_VERSION")}`,
       `EXPECTED_HERDR_VERSION=${dockerArg("HERDR_VERSION")}`,
+      `EXPECTED_GCLOUD_VERSION=${dockerArg("GCLOUD_VERSION")}`,
+      `EXPECTED_TERRAFORM_VERSION=${dockerArg("TERRAFORM_VERSION")}`,
     ]);
   });
 

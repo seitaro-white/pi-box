@@ -111,6 +111,7 @@ The default image includes:
 - **Node.js, npm and Biome**
 - **[Claude Code CLI](https://code.claude.com/docs/)** (recommended and sandbox images) — run `claude` directly or `claude auth login` to authenticate for Claude Code and the bridge. In the recommended image, `CLAUDE_CONFIG_DIR` keeps Claude Code's login, settings and sessions in the agent volume (`~/.pi/agent/claude`), so they survive container replacement.
 - **PostgreSQL client (`psql`)**
+- **Google Cloud CLI (`gcloud`, `gsutil`, `bq`) and Terraform** — pinned, checksum-verified Linux amd64/arm64 releases in every image. Compose keeps gcloud configuration and credentials in the agent volume (`~/.pi/agent/gcloud`).
 
 
 - **Pi Extensions**
@@ -168,6 +169,28 @@ Use `gh` for GitHub PRs, issues and checks. Supply your existing GitHub token as
 `GH_TOKEN` in the shell launching Pi; check with `gh auth status`. Git push/pull
 keeps using its existing credential helper. CLI config persists in
 `/home/node/.config/git/gh`; `GH_TOKEN` must be supplied for each new session.
+
+### Cloud tools
+
+Google Cloud CLI and Terraform are image-owned; update their versions and both
+architecture checksums in `Dockerfile`, then rebuild. Authenticate inside the
+container with `gcloud auth login --no-launch-browser` and, for Terraform's Google
+provider, `gcloud auth application-default login --no-launch-browser`. Credentials
+are never baked into the image. Keep Terraform projects and state in `/workspace`;
+prefer a remote state backend for shared infrastructure.
+
+If you previously installed these tools in the agent volume, copy your existing
+gcloud configuration **before replacing the container** (run on the host):
+
+```sh
+docker compose exec pi-box sh -c 'cp -a "$HOME/.config/gcloud" "$HOME/.pi/agent/gcloud" && chmod 700 "$HOME/.pi/agent/gcloud"'
+```
+
+This assumes the destination does not already exist. After rebuilding, remove the
+old `~/.pi/agent/bin/gcloud` symlink and `~/.pi/agent/bin/terraform` binary so they
+no longer shadow the image tools. Once `gcloud version` and `terraform version`
+work from the image, remove `~/.pi/agent/tools/google-cloud-sdk` to stop Pi's legacy
+custom-tools warning. Do not move the SDK into Pi's `extensions/` directory.
 
 ### Docker Sandboxes
 
@@ -254,7 +277,7 @@ The host must remain awake and online.
 
 ### Updating extensions
 
-Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff, ty, Herdr and Hunk are pinned by `ARG`s in `Dockerfile`. Herdr is also verified against per-architecture SHA-256 checksums; update them with its version from `https://herdr.dev/latest.json`. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
+Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff, ty, Herdr, Hunk, Google Cloud CLI and Terraform are pinned by `ARG`s in `Dockerfile`. Herdr, Google Cloud CLI and Terraform are also verified against per-architecture SHA-256 checksums; update them with their versions. Herdr's checksums come from `https://herdr.dev/latest.json`, Google Cloud CLI's by hashing the versioned archives (the installation page's unversioned downloads differ), and Terraform's from the release's `SHA256SUMS` file. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
 Tool installers, npm runtimes and personal skills build in independent stages, so updating one does not rerun unrelated installers. Final images configure their filesystem before copying tool artifacts, with npm packages and personal skills near the end. Pi, extensions, Biome and Claude Code share one npm installation; changing any of their pins reruns that installation. The Pi-only base runtime still reads the shared manifest, so manifest changes also invalidate its npm installation.
 

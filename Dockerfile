@@ -55,6 +55,47 @@ RUN curl -fsSL https://hunk.dev/install.sh -o /tmp/install-hunk.sh \
     && HUNK_VERSION=${HUNK_VERSION} HUNK_INSTALL_DIR=/opt/hunk sh /tmp/install-hunk.sh --no-modify-path \
     && rm /tmp/install-hunk.sh
 
+FROM system AS gcloud
+# Hash the versioned archives below, not the different unversioned downloads.
+ARG GCLOUD_VERSION=591.0.0
+ARG GCLOUD_SHA256_AMD64=78c570f5fcfe58a9311bd98c06b75530595e3cae6277aad75a676a39e6ee7b63
+ARG GCLOUD_SHA256_ARM64=f5e5df0433f77c0e7f5df9fd4bce2e46c7b7967e79cf66e31b1164d3d4c86546
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+        amd64) arch=x86_64 sha256=$GCLOUD_SHA256_AMD64 ;; \
+        arm64) arch=arm sha256=$GCLOUD_SHA256_ARM64 ;; \
+        *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${arch}.tar.gz" -o /tmp/gcloud.tar.gz \
+    && echo "${sha256}  /tmp/gcloud.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/gcloud.tar.gz -C /opt \
+    && rm /tmp/gcloud.tar.gz
+
+FROM system AS terraform
+# Checksums from the release's terraform_<version>_SHA256SUMS file.
+ARG TERRAFORM_VERSION=1.17.1
+ARG TERRAFORM_SHA256_AMD64=4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061
+ARG TERRAFORM_SHA256_ARM64=988e950a1c23058093b0e66ab2d5fb53fc18345ecfbd5871acf51dbac9325edd
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+        amd64) sha256=$TERRAFORM_SHA256_AMD64 ;; \
+        arm64) sha256=$TERRAFORM_SHA256_ARM64 ;; \
+        *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TARGETARCH}.zip" -o /tmp/terraform.zip \
+    && echo "${sha256}  /tmp/terraform.zip" | sha256sum -c - \
+    && python3 -m zipfile -e /tmp/terraform.zip /tmp/terraform \
+    && install -m 0755 /tmp/terraform/terraform /usr/local/bin/terraform \
+    && rm -rf /tmp/terraform.zip /tmp/terraform
+
+FROM system AS cloud-tools
+COPY --from=gcloud /opt/google-cloud-sdk /opt/google-cloud-sdk
+COPY --from=terraform /usr/local/bin/terraform /usr/local/bin/terraform
+ENV PATH=/opt/google-cloud-sdk/bin:$PATH \
+    CLOUDSDK_PYTHON=/usr/local/bin/python3 \
+    CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true \
+    CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+
 FROM system AS npm-runtime
 WORKDIR /opt/pi
 COPY container/package.json container/package-lock.json container/prepare-runtime.mjs ./
@@ -84,7 +125,7 @@ RUN node prepare-runtime.mjs base \
     && rm -rf /tmp/npm-cache
 
 # Docker Sandboxes kit image (pi-box.yaml): mountless, no Herdr or Hunk.
-FROM system AS sandbox
+FROM cloud-tools AS sandbox
 USER root
 RUN usermod -l agent -d /home/agent -m node \
     && groupmod -n agent node
@@ -126,8 +167,9 @@ ENTRYPOINT []
 CMD ["/bin/bash", "-l"]
 
 # Compose images: the node user, persistent-volume paths and startup scripts.
-FROM system AS common
-ENV UV_PYTHON_INSTALL_DIR=/home/node/.pi/agent/python \
+FROM cloud-tools AS common
+ENV CLOUDSDK_CONFIG=/home/node/.pi/agent/gcloud \
+    UV_PYTHON_INSTALL_DIR=/home/node/.pi/agent/python \
     UV_PYTHON_BIN_DIR=/home/node/.pi/agent/bin \
     UV_TOOL_DIR=/home/node/.pi/agent/uv-tools \
     UV_TOOL_BIN_DIR=/home/node/.pi/agent/bin \

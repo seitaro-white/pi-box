@@ -102,6 +102,10 @@ jobs:
           cache-from: type=gha,scope=pi-box-${{ matrix.arch }}-sandbox
           cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-sandbox,mode=max
 
+      # Remote caches are exported; keep loaded images but free space for sidecars.
+      - name: Free build cache before acceptance
+        run: docker buildx prune --all --force
+
       # Use the same suite selection as local development; Phoenix is opt-in.
       - name: Run disposable Docker acceptance
         env:

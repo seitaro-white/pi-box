@@ -4,6 +4,9 @@
 !pi-box.yaml
 !container/
 container/**
+!container/mise.toml
+!container/mise.lock
+!container/install-tools.sh
 !container/package.json
 !container/package-lock.json
 !container/entrypoint.sh

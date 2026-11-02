@@ -173,8 +173,6 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
       assert.equal(result.status, 0, result.stderr || result.error?.message);
     }
   }
-  assert.equal(existsSync("/opt/ruff"), profile === "recommended");
-  assert.equal(existsSync("/opt/ty"), profile === "recommended");
   if (profile === "recommended") {
     const directory = mkdtempSync(join(tmpdir(), "pi-box-lsp-"));
     t.after(() => rmSync(directory, { recursive: true, force: true }));

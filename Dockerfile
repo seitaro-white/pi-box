@@ -15,86 +15,24 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce
 RUN UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_BIN_DIR=/usr/local/bin \
     uv python install 3.13.16 --default --no-cache
 
-# Independent installers keep version bumps from invalidating unrelated tools.
-# User-neutral paths allow Compose and sandbox images to share the artifacts.
-FROM system AS ruff
-ARG RUFF_VERSION=0.17.0
-RUN UV_TOOL_DIR=/opt/ruff UV_TOOL_BIN_DIR=/usr/local/bin \
-    UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_DOWNLOADS=never \
-    uv tool install --no-cache --python /usr/local/bin/python3 "ruff==${RUFF_VERSION}"
+COPY --from=ghcr.io/jdx/mise:2026.10.25@sha256:91417f41840316b7c5da6854bef393eccea4546ae70f8baf0803e0e94287b68d /usr/local/bin/mise /usr/local/bin/mise
 
-FROM system AS ty
-ARG TY_VERSION=0.0.92
-RUN UV_TOOL_DIR=/opt/ty UV_TOOL_BIN_DIR=/usr/local/bin \
-    UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_DOWNLOADS=never \
-    uv tool install --no-cache --python /usr/local/bin/python3 "ty==${TY_VERSION}"
-
-FROM system AS herdr
-# Pinned release binary; bump the version and both checksums together, using
-# the sha256 entries in https://herdr.dev/latest.json for that release.
-ARG HERDR_VERSION=0.9.5
-ARG HERDR_SHA256_AMD64=14d9e8bc8b4a9e0118d77c32266f76d461f09b40342eb23752960bd89f59929d
-ARG HERDR_SHA256_ARM64=17d7536f2da50859523680ef279dffcac8e4a235f4e46fe8da6c2ec44141897c
+# One locked install, like npm ci; export runtime artifacts by image profile.
+FROM system AS tools
 ARG TARGETARCH
-RUN case "$TARGETARCH" in \
-        amd64) arch=x86_64 sha256=$HERDR_SHA256_AMD64 ;; \
-        arm64) arch=aarch64 sha256=$HERDR_SHA256_ARM64 ;; \
-        *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac \
-    && curl -fsSL "https://github.com/herdrdev/herdr/releases/download/v${HERDR_VERSION}/herdr-linux-${arch}" -o /tmp/herdr \
-    && echo "${sha256}  /tmp/herdr" | sha256sum -c - \
-    && install -m 0755 /tmp/herdr /usr/local/bin/herdr \
-    && rm /tmp/herdr \
-    && install -d /opt/herdr \
-    && herdr --skill > /opt/herdr/SKILL.md
-
-FROM system AS hunk
-# Hunk's standalone release bundles the matching review skill.
-ARG HUNK_VERSION=0.24.0
-RUN curl -fsSL https://hunk.dev/install.sh -o /tmp/install-hunk.sh \
-    && HUNK_VERSION=${HUNK_VERSION} HUNK_INSTALL_DIR=/opt/hunk sh /tmp/install-hunk.sh --no-modify-path \
-    && rm /tmp/install-hunk.sh
-
-FROM system AS gcloud
-# Hash the versioned archives below, not the different unversioned downloads.
-ARG GCLOUD_VERSION=591.0.0
-ARG GCLOUD_SHA256_AMD64=78c570f5fcfe58a9311bd98c06b75530595e3cae6277aad75a676a39e6ee7b63
-ARG GCLOUD_SHA256_ARM64=f5e5df0433f77c0e7f5df9fd4bce2e46c7b7967e79cf66e31b1164d3d4c86546
-ARG TARGETARCH
-RUN case "$TARGETARCH" in \
-        amd64) arch=x86_64 sha256=$GCLOUD_SHA256_AMD64 ;; \
-        arm64) arch=arm sha256=$GCLOUD_SHA256_ARM64 ;; \
-        *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac \
-    && curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${arch}.tar.gz" -o /tmp/gcloud.tar.gz \
-    && echo "${sha256}  /tmp/gcloud.tar.gz" | sha256sum -c - \
-    && tar -xzf /tmp/gcloud.tar.gz -C /opt \
-    && rm /tmp/gcloud.tar.gz
-
-FROM system AS terraform
-# Checksums from the release's terraform_<version>_SHA256SUMS file.
-ARG TERRAFORM_VERSION=1.17.1
-ARG TERRAFORM_SHA256_AMD64=4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061
-ARG TERRAFORM_SHA256_ARM64=988e950a1c23058093b0e66ab2d5fb53fc18345ecfbd5871acf51dbac9325edd
-ARG TARGETARCH
-RUN case "$TARGETARCH" in \
-        amd64) sha256=$TERRAFORM_SHA256_AMD64 ;; \
-        arm64) sha256=$TERRAFORM_SHA256_ARM64 ;; \
-        *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac \
-    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TARGETARCH}.zip" -o /tmp/terraform.zip \
-    && echo "${sha256}  /tmp/terraform.zip" | sha256sum -c - \
-    && python3 -m zipfile -e /tmp/terraform.zip /tmp/terraform \
-    && install -m 0755 /tmp/terraform/terraform /usr/local/bin/terraform \
-    && rm -rf /tmp/terraform.zip /tmp/terraform
+WORKDIR /opt/tool-config
+ENV MISE_DATA_DIR=/var/cache/mise/data \
+    MISE_CACHE_DIR=/var/cache/mise/cache \
+    MISE_CONFIG_DIR=/tmp/mise-config \
+    MISE_TRUSTED_CONFIG_PATHS=/opt/tool-config \
+    MISE_YES=1 \
+    CLOUDSDK_PYTHON=/usr/local/bin/python3
+COPY container/mise.toml container/mise.lock ./
+COPY container/install-tools.sh /tmp/install-tools.sh
+RUN --mount=type=cache,id=mise-${TARGETARCH},target=/var/cache/mise,sharing=locked sh /tmp/install-tools.sh
 
 FROM system AS cloud-tools
-COPY --from=gcloud /opt/google-cloud-sdk /opt/google-cloud-sdk
-COPY --from=terraform /usr/local/bin/terraform /usr/local/bin/terraform
-# Login shells reset PATH; expose SDK commands alongside the other image tools.
-RUN ln -s /opt/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud \
-    && ln -s /opt/google-cloud-sdk/bin/gsutil /usr/local/bin/gsutil \
-    && ln -s /opt/google-cloud-sdk/bin/bq /usr/local/bin/bq
+COPY --from=tools /out/cloud/ /
 ENV CLOUDSDK_PYTHON=/usr/local/bin/python3 \
     CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true \
     CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
@@ -141,8 +79,6 @@ RUN install -d -m 0700 -o agent -g agent /home/agent/workspace \
     && chown agent:agent /etc/sandbox-persistent.sh \
     && printf '%s\n' '. /etc/sandbox-persistent.sh' > /etc/profile.d/sandbox-persistent.sh \
     && printf '%s\n' '. /etc/sandbox-persistent.sh' >> /home/agent/.bashrc \
-    && ln -s /opt/ruff/ruff/bin/ruff /usr/local/bin/ruff \
-    && ln -s /opt/ty/ty/bin/ty /usr/local/bin/ty \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome \
     && ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude
@@ -156,8 +92,7 @@ ENV HOME=/home/agent \
     NODE_USE_ENV_PROXY=1 \
     EDITOR=micro VISUAL=micro PAGER=batcat LANG=C.UTF-8 TERM=xterm-256color
 COPY --chown=agent:agent container/defaults/micro-settings.json /home/agent/.config/micro/settings.json
-COPY --from=ruff /opt/ruff /opt/ruff
-COPY --from=ty /opt/ty /opt/ty
+COPY --from=tools /out/python/ /
 COPY --from=npm-runtime /opt/pi /opt/pi
 COPY --from=personal-skills /opt/pi/node_modules/personal-skills /opt/pi/node_modules/personal-skills
 COPY container/init-agent.mjs /opt/pi/init-agent.mjs
@@ -224,20 +159,16 @@ RUN install -d -m 0700 -o node -g node /home/node/.herdr/config \
         /home/node/.herdr/state /home/node/.local/state \
     && ln -s /home/node/.herdr/config /home/node/.config/herdr \
     && ln -s /home/node/.herdr/state /home/node/.local/state/herdr \
-    && ln -s /opt/ruff/ruff/bin/ruff /usr/local/bin/ruff \
-    && ln -s /opt/ty/ty/bin/ty /usr/local/bin/ty \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome \
     && ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude \
     && ln -s /opt/hunk/hunk /usr/local/bin/hunk \
     && install -d /home/node/.agents/skills \
+    && ln -s /opt/herdr /home/node/.agents/skills/herdr \
     && ln -s /opt/hunk/skills/hunk-review /home/node/.agents/skills/hunk-review
 COPY --chown=node:node --chmod=0600 container/defaults/herdr.toml /home/node/.herdr/config/config.toml
-COPY --from=ruff /opt/ruff /opt/ruff
-COPY --from=ty /opt/ty /opt/ty
-COPY --from=herdr /usr/local/bin/herdr /usr/local/bin/herdr
-COPY --from=herdr /opt/herdr/SKILL.md /home/node/.agents/skills/herdr/SKILL.md
-COPY --from=hunk /opt/hunk /opt/hunk
+COPY --from=tools /out/python/ /
+COPY --from=tools /out/review/ /
 COPY --from=npm-runtime /opt/pi /opt/pi
 COPY --from=personal-skills /opt/pi/node_modules/personal-skills /opt/pi/node_modules/personal-skills
 COPY container/extensions/herdr-question-state.ts /opt/pi/extensions/herdr-question-state.ts

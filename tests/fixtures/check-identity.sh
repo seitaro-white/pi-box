@@ -7,7 +7,7 @@ test "$EDITOR" = micro
 test "$VISUAL" = micro
 test "$PAGER" = batcat
 test "$(pi --version)" = "$EXPECTED_PI_VERSION"
-for tool in gh git ss make nano micro nnn batcat rg fdfind uv python tmux psql curl gcloud terraform; do command -v "$tool" >/dev/null; done
+for tool in gh git ss make nano micro nnn batcat rg fdfind uv python tmux psql curl gcloud terraform mise; do command -v "$tool" >/dev/null; done
 gh --version >/dev/null
 nano --version >/dev/null
 micro --version >/dev/null
@@ -16,6 +16,7 @@ batcat --version >/dev/null
 rg --version >/dev/null
 fdfind --version >/dev/null
 psql --version >/dev/null
+mise --version >/dev/null
 test "$(gcloud version --format=json | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8"))["Google Cloud SDK"]')" = "$EXPECTED_GCLOUD_VERSION"
 test "$(terraform version -json | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).terraform_version')" = "$EXPECTED_TERRAFORM_VERSION"
 test ! -w "$(command -v gcloud)"

@@ -28,7 +28,7 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
   - [Multiple Pi-box instances](#multiple-pi-box-instances)
   - [Running in a virtual machine](#running-in-a-virtual-machine)
   - [Tailscale](#tailscale)
-  - [Updating extensions](#updating-extensions)
+  - [Updating tools and extensions](#updating-tools-and-extensions)
 
 ## Installation and usage
 
@@ -172,9 +172,8 @@ keeps using its existing credential helper. CLI config persists in
 
 ### Cloud tools
 
-Google Cloud CLI and Terraform are image-owned; update their versions and both
-architecture checksums in `Dockerfile`, then rebuild. Authenticate inside the
-container with `gcloud auth login --no-launch-browser` and, for Terraform's Google
+Google Cloud CLI and Terraform are image-owned; see [tool updates](#updating-tools-and-extensions).
+Authenticate inside the container with `gcloud auth login --no-launch-browser` and, for Terraform's Google
 provider, `gcloud auth application-default login --no-launch-browser`. Credentials
 are never baked into the image. Keep Terraform projects and state in `/workspace`;
 prefer a remote state backend for shared infrastructure.
@@ -275,11 +274,23 @@ Tailscale can provide private access to the Docker host or VM. Run it on the hos
 
 The host must remain awake and online.
 
-### Updating extensions
+### Updating tools and extensions
 
-Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time; Ruff, ty, Herdr, Hunk, Google Cloud CLI and Terraform are pinned by `ARG`s in `Dockerfile`. Herdr, Google Cloud CLI and Terraform are also verified against per-architecture SHA-256 checksums; update them with their versions. Herdr's checksums come from `https://herdr.dev/latest.json`, Google Cloud CLI's by hashing the versioned archives (the installation page's unversioned downloads differ), and Terraform's from the release's `SHA256SUMS` file. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
+Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
-Tool installers, npm runtimes and personal skills build in independent stages, so updating one does not rerun unrelated installers. Final images configure their filesystem before copying tool artifacts, with npm packages and personal skills near the end. Pi, extensions, Biome and Claude Code share one npm installation; changing any of their pins reruns that installation. The Pi-only base runtime still reads the shared manifest, so manifest changes also invalidate its npm installation.
+Ruff, ty, Herdr, Hunk, gcloud and Terraform are pinned in
+[`container/mise.toml`](container/mise.toml). After editing a version, run the
+following with the image's mise version and commit the updated manifest and
+lockfile (Linux amd64/arm64 URLs and checksums):
+
+```sh
+mise -C container trust
+mise -C container lock --platform linux-x64,linux-arm64
+```
+
+Bundled tools run directly from `/usr/local/bin`; mise is only needed to install
+or update them. Tool, npm and personal-skill installs have separate build stages;
+the mise stage caches installed versions and downloads per architecture.
 
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 

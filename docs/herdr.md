@@ -37,6 +37,4 @@ The Herdr volume mounts at `~/.herdr` (`HERDR_VOLUME` overrides its name):
 Configuration and state survive container replacement. Pi integrations refresh
 at startup; the skill lives at `~/.agents/skills/herdr`. Use Pi's `/reload` after updates.
 
-Herdr is pinned by `HERDR_VERSION` and per-architecture checksums in the
-`Dockerfile`. To update it, change all three from the release's entries in
-`https://herdr.dev/latest.json`, then run `make up`.
+For version updates, see [Updating tools and extensions](../README.md#updating-tools-and-extensions).

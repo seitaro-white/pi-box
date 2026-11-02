@@ -28,9 +28,10 @@ const manifest =
       readFileSync(new URL("../container/package.json", import.meta.url), "utf8"),
     )
   );
-const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
-/** Read a pinned build argument's default. @param {string} arg ARG name. */
-const dockerArg = (arg) => dockerfile.match(new RegExp(`^ARG ${arg}=(.+)$`, "m"))[1];
+/** Read a pinned mise tool version. @param {string} tool Tool name. */
+const toolVersion = (tool) => readFileSync(
+  new URL("../container/mise.toml", import.meta.url), "utf8",
+).match(new RegExp(`^${tool} = "([^"]+)"$`, "m"))[1];
 
 /** @type {string[]} */
 const createdVolumes = [];
@@ -112,10 +113,10 @@ acceptanceSuite(`${profile} image: ${image}`, {
     fixture("check-identity.sh", [
       `EXPECTED_PI_VERSION=${manifest.dependencies["@earendil-works/pi-coding-agent"]}`,
       `EXPECTED_PROFILE=${profile}`,
-      `EXPECTED_HUNK_VERSION=${dockerArg("HUNK_VERSION")}`,
-      `EXPECTED_HERDR_VERSION=${dockerArg("HERDR_VERSION")}`,
-      `EXPECTED_GCLOUD_VERSION=${dockerArg("GCLOUD_VERSION")}`,
-      `EXPECTED_TERRAFORM_VERSION=${dockerArg("TERRAFORM_VERSION")}`,
+      `EXPECTED_HUNK_VERSION=${toolVersion("hunk")}`,
+      `EXPECTED_HERDR_VERSION=${toolVersion("herdr")}`,
+      `EXPECTED_GCLOUD_VERSION=${toolVersion("gcloud")}`,
+      `EXPECTED_TERRAFORM_VERSION=${toolVersion("terraform")}`,
     ]);
   });
 

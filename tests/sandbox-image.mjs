@@ -16,6 +16,7 @@ runCommand("docker", [
     pi --version
     python3 --version
     uv --version
+    mise --version
     test "$(uv python dir)" = "$HOME/.local/share/uv/python"
     test "$(uv tool dir)" = "$HOME/.local/share/uv/tools"
     test "$(uv tool dir --bin)" = "$HOME/.local/bin"

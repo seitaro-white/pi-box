@@ -37,6 +37,6 @@ The Herdr volume mounts at `~/.herdr` (`HERDR_VOLUME` overrides its name):
 Configuration and state survive container replacement. Pi integrations refresh
 at startup; the skill lives at `~/.agents/skills/herdr`. Use Pi's `/reload` after updates.
 
-Herdr is pinned by `HERDR_VERSION` and per-architecture checksums in the
-`Dockerfile`. To update it, change all three from the release's entries in
-`https://herdr.dev/latest.json`, then run `make up`.
+Herdr is pinned in `container/mise.toml`. Update its version, refresh both Linux
+platforms with `mise -C container lock --platform linux-x64,linux-arm64`, then
+run `make up`. The committed `container/mise.lock` records download checksums.

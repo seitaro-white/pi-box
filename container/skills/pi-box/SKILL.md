@@ -18,7 +18,7 @@ and sidecars are optional. Inspect configuration without printing secrets.
 | Persistent Compose path | Contents |
 |---|---|
 | `/workspace` | Projects |
-| `~/.pi/agent` | Pi settings, state and user packages; Claude Code state in `claude/` |
+| `~/.pi/agent` | Pi settings, state and user packages; Claude Code state in `claude/`; gcloud config and credentials in `gcloud/` |
 | `~/.config/git` | Git settings, HTTPS credentials and GitHub CLI login (`gh/`) |
 | `~/.herdr` | Herdr state |
 
@@ -38,6 +38,16 @@ authentication uses `GH_TOKEN`, which can reuse the existing GitHub token. If
 missing, ask the user to supply it privately in the shell launching Pi. Do not
 print credentials or request them in chat. Leave Git's credential helper unchanged.
 CLI config persists at `$GH_CONFIG_DIR` (`~/.config/git/gh`).
+
+## Cloud tools
+
+Google Cloud CLI (`gcloud`, `gsutil`, `bq`) and Terraform are image-owned in all
+variants. In Compose, `$CLOUDSDK_CONFIG` points to `~/.pi/agent/gcloud`, preserving
+logins and application default credentials across container replacement. Use
+`gcloud auth login --no-launch-browser` for CLI access and
+`gcloud auth application-default login --no-launch-browser` for Terraform's Google
+provider. Do not print credentials. Keep Terraform projects in `/workspace` and
+use a remote state backend for shared infrastructure.
 
 ## Web development
 

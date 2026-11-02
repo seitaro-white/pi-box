@@ -23,6 +23,10 @@ runCommand("docker", [
     ty --version
     biome --version
     claude --version
+    gcloud version
+    terraform version -json
+    test ! -w "$(command -v gcloud)"
+    test ! -w "$(command -v terraform)"
     node --input-type=module -e '
       import assert from "node:assert/strict";
       import { readFileSync } from "node:fs";

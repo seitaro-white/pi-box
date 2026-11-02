@@ -28,7 +28,7 @@ You can run this locally on your laptop, or on a home server/cloud VM and connec
   - [Multiple Pi-box instances](#multiple-pi-box-instances)
   - [Running in a virtual machine](#running-in-a-virtual-machine)
   - [Tailscale](#tailscale)
-  - [Updating extensions](#updating-extensions)
+  - [Updating tools and extensions](#updating-tools-and-extensions)
 
 ## Installation and usage
 
@@ -172,9 +172,8 @@ keeps using its existing credential helper. CLI config persists in
 
 ### Cloud tools
 
-Google Cloud CLI and Terraform are image-owned; update their versions in
-`container/mise.toml`, refresh `container/mise.lock`, then rebuild. Authenticate inside the
-container with `gcloud auth login --no-launch-browser` and, for Terraform's Google
+Google Cloud CLI and Terraform are image-owned; see [tool updates](#updating-tools-and-extensions).
+Authenticate inside the container with `gcloud auth login --no-launch-browser` and, for Terraform's Google
 provider, `gcloud auth application-default login --no-launch-browser`. Credentials
 are never baked into the image. Keep Terraform projects and state in `/workspace`;
 prefer a remote state backend for shared infrastructure.
@@ -275,27 +274,23 @@ Tailscale can provide private access to the Docker host or VM. Run it on the hos
 
 The host must remain awake and online.
 
-### Updating extensions
+### Updating tools and extensions
 
 Bundled Pi and extension versions are pinned in [`container/package.json`](container/package.json), except personal skills, which follow `main` at build time. `make versions` checks the npm pins against registry versions without changing anything, and labels Git commit pins without checking upstream. Update Git packages by replacing their full commit hashes in the manifest.
 
-Ruff, ty, Herdr, Hunk, Google Cloud CLI and Terraform are pinned in
-[`container/mise.toml`](container/mise.toml). Mise manages their download recipes;
-[`container/mise.lock`](container/mise.lock) records versions, URLs and checksums
-for Linux amd64/arm64. After editing a version, refresh the lockfile with the
-image's pinned mise version and commit both files:
+Ruff, ty, Herdr, Hunk, gcloud and Terraform are pinned in
+[`container/mise.toml`](container/mise.toml). After editing a version, run the
+following with the image's mise version and commit the updated manifest and
+lockfile (Linux amd64/arm64 URLs and checksums):
 
 ```sh
 mise -C container trust
 mise -C container lock --platform linux-x64,linux-arm64
 ```
 
-The image includes `mise` for these maintenance commands, but bundled tools run
-directly through `/usr/local/bin`, without mise activation, runtime downloads or
-project configuration. Node, Python and uv remain pinned in `Dockerfile` as the
-bootstrap toolchain; optional service images and pi-calm remain unchanged.
-
-Mise installs the standalone tools together in one stage, then exports only the tools each image variant needs. Changing the mise manifest or lockfile reruns that stage, but a per-architecture BuildKit cache preserves installed versions and downloads. npm and personal skills build independently. Final images configure their filesystem before copying tool artifacts, with npm packages and personal skills near the end. Pi, extensions, Biome and Claude Code share one npm installation; changing any of their pins reruns that installation. The Pi-only base runtime still reads the shared manifest, so manifest changes also invalidate its npm installation.
+Bundled tools run directly from `/usr/local/bin`; mise is only needed to install
+or update them. Tool, npm and personal-skill installs have separate build stages;
+the mise stage caches installed versions and downloads per architecture.
 
 To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 

@@ -79,8 +79,6 @@ RUN install -d -m 0700 -o agent -g agent /home/agent/workspace \
     && chown agent:agent /etc/sandbox-persistent.sh \
     && printf '%s\n' '. /etc/sandbox-persistent.sh' > /etc/profile.d/sandbox-persistent.sh \
     && printf '%s\n' '. /etc/sandbox-persistent.sh' >> /home/agent/.bashrc \
-    && ln -s /opt/ruff/ruff/bin/ruff /usr/local/bin/ruff \
-    && ln -s /opt/ty/ty/bin/ty /usr/local/bin/ty \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome \
     && ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude
@@ -161,18 +159,16 @@ RUN install -d -m 0700 -o node -g node /home/node/.herdr/config \
         /home/node/.herdr/state /home/node/.local/state \
     && ln -s /home/node/.herdr/config /home/node/.config/herdr \
     && ln -s /home/node/.herdr/state /home/node/.local/state/herdr \
-    && ln -s /opt/ruff/ruff/bin/ruff /usr/local/bin/ruff \
-    && ln -s /opt/ty/ty/bin/ty /usr/local/bin/ty \
     && ln -s /opt/pi/node_modules/.bin/pi /usr/local/bin/pi \
     && ln -s /opt/pi/node_modules/.bin/biome /usr/local/bin/biome \
     && ln -s /opt/pi/node_modules/.bin/claude /usr/local/bin/claude \
     && ln -s /opt/hunk/hunk /usr/local/bin/hunk \
     && install -d /home/node/.agents/skills \
+    && ln -s /opt/herdr /home/node/.agents/skills/herdr \
     && ln -s /opt/hunk/skills/hunk-review /home/node/.agents/skills/hunk-review
 COPY --chown=node:node --chmod=0600 container/defaults/herdr.toml /home/node/.herdr/config/config.toml
 COPY --from=tools /out/python/ /
 COPY --from=tools /out/review/ /
-COPY --from=tools /out/review/opt/herdr/SKILL.md /home/node/.agents/skills/herdr/SKILL.md
 COPY --from=npm-runtime /opt/pi /opt/pi
 COPY --from=personal-skills /opt/pi/node_modules/personal-skills /opt/pi/node_modules/personal-skills
 COPY container/extensions/herdr-question-state.ts /opt/pi/extensions/herdr-question-state.ts

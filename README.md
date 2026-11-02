@@ -52,38 +52,14 @@ There are also convenience targets in `Makefile`. The workspace, Pi settings, Gi
 Pi-devbox includes a main dev container that contains Pi and basic dev tools, with optional PostgreSQL, Browserless Chromium and Phoenix tracing sidecars. These are managed with Docker Compose.
 
 ```mermaid
-flowchart TD
-    subgraph compose["Containers managed by Docker Compose"]
-        pi["Pi Box: tmux, Pi, extensions and dev tools"]
-        db["Optional PostgreSQL container"]
-        browser["Optional Browserless Chromium container"]
-        phoenix["Optional Phoenix trace viewer"]
-        pi -. "postgres:5432" .-> db
-        pi -. "CDP: browser:3000" .-> browser
-        pi -. "OTLP HTTP: phoenix:6006" .-> phoenix
-    end
-
-    subgraph volumes["Persistent volumes"]
-        workspace["Workspace: /workspace"]
-        agent["Pi state: /home/node/.pi/agent"]
-        git["Git: /home/node/.config/git"]
-        herdr["Herdr: /home/node/.herdr"]
-        data["Optional PostgreSQL data"]
-        traces["Optional Phoenix SQLite traces"]
-    end
-
-    pi --> workspace
-    pi --> agent
-    pi --> git
-    pi --> herdr
-    db --> data
-    phoenix --> traces
-
-    classDef core fill:#dbeafe,stroke:#2563eb,color:#172554
-    classDef optional fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-dasharray:5 5
-    class pi,workspace,agent,git,herdr core
-    class db,data,browser,phoenix,traces optional
+flowchart LR
+    pi["pi-devbox<br/>tmux · Pi · dev tools"]
+    pi -.-> db[("PostgreSQL")]
+    pi -.-> browser["Chromium (CDP)"]
+    pi -.-> phoenix["Phoenix traces"]
 ```
+
+Dashed arrows are optional sidecars. The workspace, Pi state, Git config and Herdr state live in persistent volumes.
 
 The development container runs as the non-root `node` user, with Linux capabilities dropped and no host home directory or Docker socket mounted. This reduces privileges, but is **not a complete agent sandbox**: Pi can still modify or delete mounted files and use outbound network access to leak credentials available inside the container. Isolation does not prevent prompt injection; it limits what an agent following malicious instructions can reach.
 

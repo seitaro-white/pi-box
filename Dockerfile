@@ -91,8 +91,11 @@ RUN case "$TARGETARCH" in \
 FROM system AS cloud-tools
 COPY --from=gcloud /opt/google-cloud-sdk /opt/google-cloud-sdk
 COPY --from=terraform /usr/local/bin/terraform /usr/local/bin/terraform
-ENV PATH=/opt/google-cloud-sdk/bin:$PATH \
-    CLOUDSDK_PYTHON=/usr/local/bin/python3 \
+# Login shells reset PATH; expose SDK commands alongside the other image tools.
+RUN ln -s /opt/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud \
+    && ln -s /opt/google-cloud-sdk/bin/gsutil /usr/local/bin/gsutil \
+    && ln -s /opt/google-cloud-sdk/bin/bq /usr/local/bin/bq
+ENV CLOUDSDK_PYTHON=/usr/local/bin/python3 \
     CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true \
     CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 

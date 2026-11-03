@@ -1,18 +1,17 @@
-<div align="center">
+
 
 # Pi-devbox
 
-*A lightweight & isolated dev container for coding agents, built around the [Pi](https://pi.dev) harness.*
+A lightweight dev container for coding agents, built around the [Pi](https://pi.dev) agent harness, that I have been using for my work.
 
-[![CI](https://github.com/seitaro-white/pi-devbox/actions/workflows/ci.yml/badge.svg)](https://github.com/seitaro-white/pi-devbox/actions/workflows/ci.yml)
-[![Pi](https://img.shields.io/badge/built%20on-Pi-8A2BE2)](https://pi.dev)
-[![Last commit](https://img.shields.io/github/last-commit/seitaro-white/pi-devbox)](https://github.com/seitaro-white/pi-devbox/commits)
+[Quick start](#quick-start) 
 
-[Quick start](#quick-start) · [Architecture](#architecture) · [What's included](#whats-included) · [Advanced docs](docs/advanced.md)
+[Architecture](#architecture) 
 
-</div>
+[What's included](#whats-included) 
 
----
+[Advanced docs](docs/advanced.md) 
+
 
 ## Why?
 
@@ -46,7 +45,7 @@ There are also convenience targets in `Makefile`. The workspace, Pi settings, Gi
 
 ## Architecture
 
-Pi-devbox includes a main dev container that contains Pi and basic dev tools, with optional PostgreSQL, Browserless Chromium and Phoenix tracing sidecars. These are managed with Docker Compose.
+Pi-devbox includes a main dev container that contains Pi and basic dev tools, and a few optional sidecar containers for Postgre, Browserless Chromium and Phoenix tracing. Managed with Docker compose
 
 ```mermaid
 flowchart LR
@@ -56,17 +55,13 @@ flowchart LR
     pi -.-> phoenix["Phoenix traces"]
 ```
 
-Dashed arrows are optional sidecars. The workspace, Pi state, Git config and Herdr state live in persistent volumes.
-
-The development container runs as the non-root `node` user, with Linux capabilities dropped and no host home directory or Docker socket mounted. This reduces privileges, but is **not a complete agent sandbox**: Pi can still modify or delete mounted files and use outbound network access to leak credentials available inside the container. Isolation does not prevent prompt injection; it limits what an agent following malicious instructions can reach.
-
 ## What's included
 
-### Packages and sidecars
+### Packages
 
 The default image includes:
 
-- **Pi** — coding agent harness - model agnostic, minimal and easily extendable. Pi is great and you should check it out regardless of whether you use this container
+- **Pi** — The core agent harness - model agnostic, minimal and easily extendable.
 - **tmux** - terminal multiplexer, for managing multiple terminal sessions/long-running processes.
 - **[Herdr](https://herdr.dev/)** (recommended image) — optional agent session manager, with its official `herdr` skill exposed to Pi. See [Pi-devbox setup and storage](docs/herdr.md).
 - **[Hunk](https://hunk.dev/)** (recommended image) — interactive terminal diff reviewer, with its `hunk-review` skill exposed to Pi. See [Hunk](https://github.com/modem-dev/hunk).

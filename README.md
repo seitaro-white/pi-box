@@ -2,12 +2,9 @@
 
 # Pi-devbox
 
-*A lightweight, isolated dev container for coding agents, built around the [Pi](https://pi.dev) harness.*
+*A lightweight & isolated dev container for coding agents, built around the [Pi](https://pi.dev) harness.*
 
 [![CI](https://github.com/seitaro-white/pi-devbox/actions/workflows/ci.yml/badge.svg)](https://github.com/seitaro-white/pi-devbox/actions/workflows/ci.yml)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Platforms](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-blue)
-![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 [![Pi](https://img.shields.io/badge/built%20on-Pi-8A2BE2)](https://pi.dev)
 [![Last commit](https://img.shields.io/github/last-commit/seitaro-white/pi-devbox)](https://github.com/seitaro-white/pi-devbox/commits)
 
@@ -17,7 +14,7 @@
 
 ---
 
-## Why
+## Why?
 
 Dev containers are particularly useful for agentic software engineering because they:
 

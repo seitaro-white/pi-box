@@ -9,10 +9,12 @@ runCommand("docker", [
     test "$(id -un)" = agent
     test "$(id -u)" = 1000
     test "$HOME" = /home/agent
+    test "$PI_TELEMETRY" = 0
     test "$PWD" = /home/agent/workspace
     test ! -f ~/.pi/agent/auth.json
     test ! -f ~/.git-credentials
     test ! -S /var/run/docker.sock
+    for path in ~/.pi ~/.local ~/.config ~/.docker; do test -w "$path"; done
     pi --version
     python3 --version
     uv --version

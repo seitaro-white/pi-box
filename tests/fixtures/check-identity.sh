@@ -57,6 +57,7 @@ test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600
 test "$(stat -c %a /home/node/.pi/agent/pi-box-packages.json)" = 600
 test -w /workspace
 test -w /home/node/.pi/agent
+test -w /home/node/.local
 test "$GH_CONFIG_DIR" = /home/node/.config/git/gh
 test "$GIT_CONFIG_GLOBAL" = /home/node/.config/git/config
 test -w /home/node/.config/git

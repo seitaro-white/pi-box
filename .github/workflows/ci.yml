@@ -65,18 +65,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build base image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          target: base
-          platforms: linux/${{ matrix.arch }}
-          tags: pi-box:ci-base
-          load: true
-          push: false
-          cache-from: type=gha,scope=pi-box-${{ matrix.arch }}-base
-          cache-to: type=gha,scope=pi-box-${{ matrix.arch }}-base,mode=max
-
       - name: Build recommended image
         uses: docker/build-push-action@v7
         with:
@@ -109,7 +97,6 @@ jobs:
       # Use the same suite selection as local development; Phoenix is opt-in.
       - name: Run disposable Docker acceptance
         env:
-          PI_BOX_BASE_IMAGE: pi-box:ci-base
           PI_BOX_RECOMMENDED_IMAGE: pi-box:ci-recommended
           PI_BOX_SANDBOX_IMAGE: pi-box:ci-sandbox
         run: npm run test:integration

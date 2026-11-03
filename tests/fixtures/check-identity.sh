@@ -25,7 +25,7 @@ test "$CLOUDSDK_CONFIG" = /home/node/.pi/agent/gcloud
 gcloud config set project pi-box-smoke-test
 test "$(gcloud config get project)" = pi-box-smoke-test
 test -d "$CLOUDSDK_CONFIG/configurations"
-# The client is present in both variants, never the PostgreSQL server.
+# Only the client is installed, never the PostgreSQL server.
 if command -v postgres >/dev/null; then
     echo "PostgreSQL server must not be installed in the Pi image" >&2
     exit 1
@@ -34,38 +34,23 @@ fi
 test "$(uv python dir)" = /home/node/.pi/agent/python
 test "$(uv tool dir)" = /home/node/.pi/agent/uv-tools
 test "$(uv tool dir --bin)" = /home/node/.pi/agent/bin
-if [ "$EXPECTED_PROFILE" = recommended ]; then
-    test "$(herdr --version)" = "herdr $EXPECTED_HERDR_VERSION"
-    test "$(hunk --version)" = "$EXPECTED_HUNK_VERSION"
-    test ! -w "$(command -v hunk)"
-    test -r /home/node/.agents/skills/hunk-review/SKILL.md
-    test ! -w /home/node/.agents/skills/hunk-review/SKILL.md
-    test -r /home/node/.agents/skills/herdr/SKILL.md
-    test ! -w /home/node/.agents/skills/herdr/SKILL.md
-    test -s /home/node/.pi/agent/extensions/herdr-agent-state.ts
-    test "$(stat -c %u /usr/local/bin/herdr)" = 0
-    test ! -w /usr/local/bin/herdr
-    test "$(readlink /home/node/.config/herdr)" = /home/node/.herdr/config
-    test "$(readlink /home/node/.local/state/herdr)" = /home/node/.herdr/state
-    for path in /home/node/.herdr /home/node/.herdr/config /home/node/.herdr/state; do
-        test "$(stat -c %a "$path")" = 700
-        test -w "$path"
-    done
-    test "$(stat -c %a /home/node/.config/herdr/config.toml)" = 600
-else
-    if command -v herdr >/dev/null; then
-        echo "Herdr must not be installed in the base image" >&2
-        exit 1
-    fi
-    test ! -e /home/node/.herdr/config
-    test ! -e /opt/hunk
-    test ! -e /home/node/.agents/skills/herdr
-    if command -v hunk >/dev/null; then
-        echo "Hunk must not be installed in the base image" >&2
-        exit 1
-    fi
-    test ! -e /home/node/.pi/agent/extensions/herdr-agent-state.ts
-fi
+test "$(herdr --version)" = "herdr $EXPECTED_HERDR_VERSION"
+test "$(hunk --version)" = "$EXPECTED_HUNK_VERSION"
+test ! -w "$(command -v hunk)"
+test -r /home/node/.agents/skills/hunk-review/SKILL.md
+test ! -w /home/node/.agents/skills/hunk-review/SKILL.md
+test -r /home/node/.agents/skills/herdr/SKILL.md
+test ! -w /home/node/.agents/skills/herdr/SKILL.md
+test -s /home/node/.pi/agent/extensions/herdr-agent-state.ts
+test "$(stat -c %u /usr/local/bin/herdr)" = 0
+test ! -w /usr/local/bin/herdr
+test "$(readlink /home/node/.config/herdr)" = /home/node/.herdr/config
+test "$(readlink /home/node/.local/state/herdr)" = /home/node/.herdr/state
+for path in /home/node/.herdr /home/node/.herdr/config /home/node/.herdr/state; do
+    test "$(stat -c %a "$path")" = 700
+    test -w "$path"
+done
+test "$(stat -c %a /home/node/.config/herdr/config.toml)" = 600
 test ! -w /opt/pi
 test "$(stat -c %a /home/node/.pi/agent)" = 700
 test "$(stat -c %a /home/node/.pi/agent/settings.json)" = 600

@@ -4,12 +4,7 @@ import { runCommand } from "./helpers/engine.mjs";
 
 const suites = {
   config: ["compose-configuration.mjs"],
-  base: ["smoke.mjs", {
-    PI_BOX_PROFILE: "base",
-    PI_BOX_IMAGE: process.env.PI_BOX_BASE_IMAGE || "pi-box:0.2.0-base",
-  }],
   recommended: ["smoke.mjs", {
-    PI_BOX_PROFILE: "recommended",
     PI_BOX_IMAGE: process.env.PI_BOX_RECOMMENDED_IMAGE || "pi-box:0.2.0",
   }],
   herdr: ["herdr-integration.mjs"],

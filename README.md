@@ -107,5 +107,5 @@ The recommended image bundles my [personal development skills](https://github.co
 
 ## Documentation
 
-- [Advanced setup and technical details](docs/advanced.md): base image, Git and cloud tools, web dev ports, optional services, Tailscale, LSP and skills build details, updating extensions, testing
+- [Advanced setup and technical details](docs/advanced.md): Git and cloud tools, web dev ports, optional services, Tailscale, LSP and skills build details, updating extensions, testing
 - [Herdr](docs/herdr.md) · [Browserless](docs/browserless.md) · [Phoenix](docs/phoenix.md) · [Docker Sandboxes](docs/sandboxes.md) · [Tests](tests/README.md)

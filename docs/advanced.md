@@ -2,16 +2,9 @@
 
 Detailed configuration, operations and maintenance notes moved out of the [README](../README.md).
 
-## Base image
+## Image guidance
 
-The default build target is `recommended`. A stripped-down `base` target includes Pi and the shared development tools, but omits Herdr, Hunk (including its skill), the bundled Pi extensions, Claude Code CLI, Ruff, ty and Biome. To select it, set these overrides in your local `.env` before building:
-
-```dotenv
-TARGET=base
-IMAGE=pi-box:0.2.0-base
-```
-
-Both Compose variants include `/AGENTS.md` and a `pi-box` skill with environment
+The image includes `/AGENTS.md` and a `pi-box` skill with environment
 and service instructions. Replacing the image updates these without changing
 personal Pi settings; use `/reload` in existing Pi sessions. uv Python/tool
 installs persist in the agent volume.
@@ -147,7 +140,7 @@ Bundled tools run directly from `/usr/local/bin`; mise is only needed to install
 or update them. Tool, npm and personal-skill installs have separate build stages;
 the mise stage caches installed versions and downloads per architecture.
 
-To change bundled packages, edit the manifest, regenerate the derived manifests/registrations with `container/prepare-runtime.mjs` for both image targets, and refresh both npm lockfiles. Commit those changes together, test both variants, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
+To change bundled packages, edit the manifest, regenerate the derived registrations with `container/prepare-runtime.mjs`, and refresh the npm lockfile. Commit those changes together, then rebuild and recreate the container (`make up`). Replacing the container ends running sessions, so finish active work first.
 
 Rebuilds retain persistent Pi settings, credentials and user-installed packages. Image-managed extension registrations are reconciled at startup; rebuilding does not reset your personal configuration.
 

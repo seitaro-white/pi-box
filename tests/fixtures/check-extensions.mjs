@@ -17,12 +17,10 @@ import {
   SessionManager,
 } from "/opt/pi/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
 
-const profile = process.env.EXPECTED_PROFILE;
 const piPackage = "@earendil-works/pi-coding-agent";
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
-test(`${profile}: exact package pins, extension loading and basic diagnostics`, async (t) => {
-  assert(["base", "recommended"].includes(profile));
+test("exact package pins, extension loading and basic diagnostics", async (t) => {
   const expectedManifest = JSON.parse(process.env.EXPECTED_MANIFEST_JSON);
   const expected = expectedManifest.dependencies;
   const manifest = readJson("/opt/pi/package.json");
@@ -30,10 +28,7 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   const extensions = Object.keys(expected).filter(
     (name) => name !== piPackage && !npmTools.includes(name),
   );
-  assert.deepEqual(
-    manifest.dependencies,
-    profile === "base" ? { [piPackage]: expected[piPackage] } : expected,
-  );
+  assert.deepEqual(manifest.dependencies, expected);
 
   // The image must not seed policy files before upstream extensions initialize.
   const agentDir = join(homedir(), ".pi", "agent");
@@ -46,25 +41,19 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   }
   for (const name of [...extensions, ...npmTools]) {
     const path = `/opt/pi/node_modules/${name}/package.json`;
-    assert.equal(
-      existsSync(path),
-      profile === "recommended",
-      `package presence for ${name}`,
-    );
-    if (profile === "recommended") {
-      const pin = expected[name];
-      if (pin.startsWith("git+")) {
-        const locked = readJson("/opt/pi/package-lock.json").packages[`node_modules/${name}`];
-        assert.equal(locked.resolved.replace("git+ssh://git@github.com/", "git+https://github.com/"), pin, name);
-        assert.equal(readJson(path).version, locked.version, name);
-      } else {
-        assert.equal(readJson(path).version, pin, name);
-      }
+    assert(existsSync(path), `package presence for ${name}`);
+    const pin = expected[name];
+    if (pin.startsWith("git+")) {
+      const locked = readJson("/opt/pi/package-lock.json").packages[`node_modules/${name}`];
+      assert.equal(locked.resolved.replace("git+ssh://git@github.com/", "git+https://github.com/"), pin, name);
+      assert.equal(readJson(path).version, locked.version, name);
+    } else {
+      assert.equal(readJson(path).version, pin, name);
     }
   }
 
   const personalSkills = "/opt/pi/node_modules/personal-skills";
-  assert.equal(existsSync(`${personalSkills}/package.json`), profile === "recommended");
+  assert(existsSync(`${personalSkills}/package.json`));
   assert.equal(existsSync(`${personalSkills}/.git`), false);
   assert.equal(readJson("/opt/pi/package-lock.json").packages["node_modules/personal-skills"], undefined);
 
@@ -95,14 +84,12 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   assert(environmentSkills[0].description.trim(), 'environment skill has a description');
   assert.deepEqual(loader.getSkills().diagnostics, []);
   const herdrSkills = loader.getSkills().skills.filter((skill) => skill.name === "herdr");
-  assert.equal(herdrSkills.length, profile === "recommended" ? 1 : 0);
-  if (profile === "recommended") {
-    const official = spawnSync("herdr", ["--skill"], { encoding: "utf8" });
-    assert.equal(official.status, 0, official.stderr || official.error?.message);
-    assert.equal(readFileSync(herdrSkills[0].filePath, "utf8"), official.stdout);
-  }
+  assert.equal(herdrSkills.length, 1);
+  const official = spawnSync("herdr", ["--skill"], { encoding: "utf8" });
+  assert.equal(official.status, 0, official.stderr || official.error?.message);
+  assert.equal(readFileSync(herdrSkills[0].filePath, "utf8"), official.stdout);
   const hunkSkills = loader.getSkills().skills.filter((skill) => skill.name === "hunk-review");
-  assert.equal(hunkSkills.length, profile === "recommended" ? 1 : 0);
+  assert.equal(hunkSkills.length, 1);
   const { session } = await createAgentSession({
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(),
@@ -125,7 +112,7 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
   const errors = [];
   await session.bindExtensions({ onError: (error) => errors.push(error) });
   const tools = new Set(session.getAllTools().map((tool) => tool.name));
-  const bundled = new Set(profile === "recommended" ? extensions : []);
+  const bundled = new Set(extensions);
   for (const [packageName, name] of [
     ["pi-subagents", "subagent"],
     ["pi-web-access", "fetch_content"],
@@ -159,52 +146,45 @@ test(`${profile}: exact package pins, extension loading and basic diagnostics`, 
     "/calm command",
   );
   for (const name of ["create-plan", "review-changes", "clean-up"]) {
-    assert.equal(
+    assert(
       loader.getSkills().skills.some((skill) => skill.name === name),
-      profile === "recommended",
       `personal skill ${name}`,
     );
   }
   for (const command of ["ruff", "ty", "biome", "claude"]) {
     const result = spawnSync(command, ["--version"], { encoding: "utf8" });
-    if (profile === "base") {
-      assert.equal(result.error?.code, "ENOENT", `${command} absent from base`);
-    } else {
-      assert.equal(result.status, 0, result.stderr || result.error?.message);
-    }
+    assert.equal(result.status, 0, result.stderr || result.error?.message);
   }
-  if (profile === "recommended") {
-    const directory = mkdtempSync(join(tmpdir(), "pi-box-lsp-"));
-    t.after(() => rmSync(directory, { recursive: true, force: true }));
-    const tool = (name) => {
-      const definition = session.agent.state.tools.find(
-        (item) => item.name === name,
-      );
-      assert(definition, `active tool ${name}`);
-      return definition;
-    };
-    const diagnostics = async (server, path) => {
-      const result = await tool("lsp_diagnostics").execute(`smoke-${server}`, {
-        server,
-        root: directory,
-        paths: [path],
-        limit: 1,
-      });
-      assert.notEqual(result.isError, true);
-      return result.content
-        .filter((item) => item.type === "text")
-        .map((item) => item.text)
-        .join("\n");
-    };
-    const python = join(directory, "demo.py");
-    writeFileSync(python, "import os\n");
-    assert.match(await diagnostics("ruff", python), /F401/);
-    writeFileSync(python, 'value: int = "not an integer"\n');
-    assert.match(await diagnostics("ty", python), /invalid-assignment/);
-    const javascript = join(directory, "demo.mjs");
-    writeFileSync(javascript, "let value = 1;\nconsole.log(value);\n");
-    assert.match(await diagnostics("biome", javascript), /useConst/);
-  }
+  const directory = mkdtempSync(join(tmpdir(), "pi-box-lsp-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const tool = (name) => {
+    const definition = session.agent.state.tools.find(
+      (item) => item.name === name,
+    );
+    assert(definition, `active tool ${name}`);
+    return definition;
+  };
+  const diagnostics = async (server, path) => {
+    const result = await tool("lsp_diagnostics").execute(`smoke-${server}`, {
+      server,
+      root: directory,
+      paths: [path],
+      limit: 1,
+    });
+    assert.notEqual(result.isError, true);
+    return result.content
+      .filter((item) => item.type === "text")
+      .map((item) => item.text)
+      .join("\n");
+  };
+  const python = join(directory, "demo.py");
+  writeFileSync(python, "import os\n");
+  assert.match(await diagnostics("ruff", python), /F401/);
+  writeFileSync(python, 'value: int = "not an integer"\n');
+  assert.match(await diagnostics("ty", python), /invalid-assignment/);
+  const javascript = join(directory, "demo.mjs");
+  writeFileSync(javascript, "let value = 1;\nconsole.log(value);\n");
+  assert.match(await diagnostics("biome", javascript), /useConst/);
   assert.deepEqual(errors, []);
   // LSP tools run only on synthetic files; no provider/model tools are invoked.
 });

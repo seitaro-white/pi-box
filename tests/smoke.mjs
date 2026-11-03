@@ -6,12 +6,7 @@ import { acceptanceSuite, waitFor } from "./helpers/acceptance.mjs";
 import { runCommand } from "./helpers/engine.mjs";
 
 const env = process.env;
-const profile = env.PI_BOX_PROFILE || "recommended";
-if (profile !== "base" && profile !== "recommended") {
-  throw new Error("PI_BOX_PROFILE must be base or recommended");
-}
-const image =
-  env.PI_BOX_IMAGE || `pi-box:0.2.0${profile === "base" ? "-base" : ""}`;
+const image = env.PI_BOX_IMAGE || "pi-box:0.2.0";
 const docker = (args, options = {}) => runCommand("docker", args, options);
 const name = `pi-box-smoke-${randomUUID()}`;
 const volumes = [
@@ -55,7 +50,7 @@ function fixture(filename, variables = []) {
   );
 }
 
-acceptanceSuite(`${profile} image: ${image}`, {
+acceptanceSuite(`image: ${image}`, {
   names: `container ${name}, volumes ${volumes.map((volume) => volume.name).join(", ")}`,
   /** Launch with private test volumes, reduced privileges and no network. */
   async setup() {
@@ -112,7 +107,6 @@ acceptanceSuite(`${profile} image: ${image}`, {
   step("identity, pinned tools and private state directories", () => {
     fixture("check-identity.sh", [
       `EXPECTED_PI_VERSION=${manifest.dependencies["@earendil-works/pi-coding-agent"]}`,
-      `EXPECTED_PROFILE=${profile}`,
       `EXPECTED_HUNK_VERSION=${toolVersion("hunk")}`,
       `EXPECTED_HERDR_VERSION=${toolVersion("herdr")}`,
       `EXPECTED_GCLOUD_VERSION=${toolVersion("gcloud")}`,
@@ -123,7 +117,6 @@ acceptanceSuite(`${profile} image: ${image}`, {
   step("extensions, guidance and diagnostics load offline", () => {
     fixture("check-extensions.mjs", [
       "PI_OFFLINE=1",
-      `EXPECTED_PROFILE=${profile}`,
       `EXPECTED_MANIFEST_JSON=${JSON.stringify(manifest)}`,
     ]);
   });

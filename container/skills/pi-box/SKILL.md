@@ -10,8 +10,7 @@ description: >-
 # Pi-box environment
 
 Compose runs as `node`, home `/home/node`, projects in `/workspace`.
-Check task-relevant tools and configuration: base/recommended images differ,
-and sidecars are optional. Inspect configuration without printing secrets.
+Check task-relevant tools and configuration: sidecars are optional. Inspect configuration without printing secrets.
 
 ## Storage and tools
 

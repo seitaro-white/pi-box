@@ -28,6 +28,3 @@ container/skills/**
 container/skills/pi-box/**
 !container/skills/pi-box/SKILL.md
 !container/prepare-runtime.mjs
-!container/base/
-container/base/**
-!container/base/package-lock.json
